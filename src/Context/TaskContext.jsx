@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
 
 //Create Context
 export const TaskContext = createContext();
@@ -7,10 +7,21 @@ export const TaskContext = createContext();
 const TaskProvider = ({ children }) => {
 
   //This is where our tasks will live
-  const [tasks, setTasks] = useState([
-    { id: 1, title: "Learn React", completed: false },
-    { id: 2, title: "Build TaskFlow", completed: false }
-  ]);
+  const [tasks, setTasks] = useState(() => {
+    const savedTasks = localStorage.getItem("tasks");
+    if(savedTasks){
+      return JSON.parse(savedTasks)
+    }
+
+    return [
+       { id: 1, title: "Learn React", completed: false },
+       { id: 2, title: "Build TaskFlow", completed: false }
+    ]
+  }); 
+
+  useEffect(() => {
+    localStorage.setItem("tasks", JSON.stringify(tasks))
+  }, [tasks]);
 
    const addTask = (title) => {
         const newTask = {
