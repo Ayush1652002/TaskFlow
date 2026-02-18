@@ -51,6 +51,27 @@ export default function Analytics() {
     { name: "Pending", tasks: pending },
   ];
 
+  const last7Days = Array.from({ length: 7 }).map((_, i) => {
+  const date = new Date();
+  date.setDate(date.getDate() - (6 - i));
+  return date.toDateString();
+});
+
+// Completed tasks for each of last 7 days
+const weeklyCompletedData = last7Days.map((day) => {
+  return {
+    day: day.slice(0, 3), // Mon, Tue, etc
+    completed: tasks.filter(
+      (task) =>
+        task.completedAt &&
+        new Date(task.completedAt).toDateString() === day
+    ).length,
+  };
+});
+
+
+
+
   return (
     <div className="p-6 space-y-6">
 
@@ -133,6 +154,28 @@ export default function Analytics() {
         </div>
 
       </div>
+
+      <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 mt-6">
+  <h2 className="text-lg font-semibold mb-4">
+    Weekly Completed Tasks
+  </h2>
+
+  <div className="h-72">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={weeklyCompletedData}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+        <XAxis dataKey="day" stroke="#ccc" />
+        <YAxis stroke="#ccc" />
+        <Tooltip />
+        <Bar
+          dataKey="completed"
+          fill="#22c55e"
+          radius={[6, 6, 0, 0]}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</div>
 
     </div>
   );
