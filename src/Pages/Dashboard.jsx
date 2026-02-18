@@ -14,9 +14,11 @@ const Dashboard = () => {
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all");
 
+  const [priority, setPriority] = useState("Medium");
+
   const handleAdd = () => {
     if (!newTask.trim()) return;
-    addTask(newTask);
+     addTask({ title: newTask,priority: priority,});
     setNewTask("");
   };
 
@@ -54,6 +56,17 @@ const Dashboard = () => {
           placeholder="Enter task..."
           className="flex-1 bg-slate-800 border border-slate-700 px-5 py-3 rounded-2xl outline-none"
         />
+
+<select
+  value={priority}
+  onChange={(e) => setPriority(e.target.value)}
+  className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-white"
+>
+  <option value="Low">Low</option>
+  <option value="Medium">Medium</option>
+  <option value="High">High</option>
+</select>
+
         <button
           onClick={handleAdd}
           className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-2xl font-medium transition"

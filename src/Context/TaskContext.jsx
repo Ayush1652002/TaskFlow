@@ -17,16 +17,18 @@ const TaskProvider = ({ children }) => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-  const addTask = (title) => {
-    const newTask = {
-  id: Date.now().toString(),
-  title,
-  completed: false,
-  createdAt: new Date().toISOString(),
-  completedAt: null,
-};
-    setTasks(prev => [...prev, newTask]);
+  const addTask = ({ title, priority }) => {
+  const newTask = {
+    id: Date.now().toString(),
+    title,
+    completed: false,
+    priority: priority || "Medium",
+    createdAt: new Date().toISOString(),
+    completedAt: null,
   };
+
+  setTasks(prev => [...prev, newTask]);
+};
 
   const toggleTask = (id) => {
   setTasks(prev =>
