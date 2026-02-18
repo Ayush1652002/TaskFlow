@@ -56,7 +56,7 @@ const Layout = () => {
       </header>
 
       {/* Content */}
-      <main className="p-6 bg-gray-100">
+      <main className="p-8 bg-gradient-to-br from-gray-100 to-gray-200 overflow-auto">
         <Outlet />
       </main>
 
