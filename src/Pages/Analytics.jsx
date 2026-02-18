@@ -17,6 +17,24 @@ import {
 export default function Analytics() {
   const { tasks } = useContext(TaskContext);
 
+  // Today's date (local)
+  const today = new Date().toDateString();
+
+  // Tasks created today
+  const createdToday = tasks.filter(
+    task =>
+      task.createdAt &&
+      new Date(task.createdAt).toDateString() === today
+  ).length;
+
+  // Tasks completed today
+  const completedToday = tasks.filter(
+    task =>
+      task.completedAt &&
+      new Date(task.completedAt).toDateString() === today
+  ).length;
+
+
   const total = tasks.length;
   const completed = tasks.filter((t) => t.completed).length;
   const pending = total - completed;
@@ -59,6 +77,16 @@ export default function Analytics() {
           <p className="text-2xl font-bold mt-2">{completionRate}%</p>
         </div>
 
+        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
+          <h3 className="text-sm text-gray-400">Created Today</h3>
+          <p className="text-2xl font-bold mt-2">{createdToday}</p>
+        </div>
+
+        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
+          <h3 className="text-sm text-gray-400">Completed Today</h3>
+          <p className="text-2xl font-bold mt-2">{completedToday}</p>
+        </div>
+
       </div>
 
       {/* Charts */}
@@ -71,12 +99,12 @@ export default function Analytics() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                   data={pieData}
-  dataKey="value"
-  outerRadius={100}
-  label
-  isAnimationActive={true}
-  animationDuration={2000}
+                  data={pieData}
+                  dataKey="value"
+                  outerRadius={100}
+                  label
+                  isAnimationActive={true}
+                  animationDuration={2000}
                 >
                   <Cell fill="#10B981" />
                   <Cell fill="#F43F5E" />

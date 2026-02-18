@@ -19,22 +19,32 @@ const TaskProvider = ({ children }) => {
 
   const addTask = (title) => {
     const newTask = {
-      id: Date.now().toString(),
-      title,
-      completed: false
-    };
+  id: Date.now().toString(),
+  title,
+  completed: false,
+  createdAt: new Date().toISOString(),
+  completedAt: null,
+};
     setTasks(prev => [...prev, newTask]);
   };
 
   const toggleTask = (id) => {
-    setTasks(prev =>
-      prev.map(task =>
-        task.id === id
-          ? { ...task, completed: !task.completed }
-          : task
-      )
-    );
-  };
+  setTasks(prev =>
+    prev.map(task => {
+      if (task.id !== id) return task;
+
+      const isCompleting = !task.completed;
+
+      return {
+        ...task,
+        completed: isCompleting,
+        completedAt: isCompleting
+          ? new Date().toISOString()
+          : null,
+      };
+    })
+  );
+};
 
   const deleteTask = (id) => {
     setTasks(prev => prev.filter(task => task.id !== id));
