@@ -1,51 +1,68 @@
 import { createContext, useState, useEffect } from "react";
 
-//Create Context
 export const TaskContext = createContext();
 
-//Create Provider Component
 const TaskProvider = ({ children }) => {
-
-  //This is where our tasks will live
   const [tasks, setTasks] = useState(() => {
-    const savedTasks = localStorage.getItem("tasks");
-    if(savedTasks){
-      return JSON.parse(savedTasks)
-    }
-
-    return [
-       { id: 1, title: "Learn React", completed: false },
-       { id: 2, title: "Build TaskFlow", completed: false }
-    ]
-  }); 
+    const saved = localStorage.getItem("tasks");
+    return saved
+      ? JSON.parse(saved)
+      : [
+          { id: "1", title: "Learn React", completed: false },
+          { id: "2", title: "Build TaskFlow", completed: false }
+        ];
+  });
 
   useEffect(() => {
-    localStorage.setItem("tasks", JSON.stringify(tasks))
+    localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-   const addTask = (title) => {
-        const newTask = {
-            id: Date.now(),
-            title,
-            completed: false
-        }
-        setTasks((prev) => [...prev, newTask])
-    }
+  const addTask = (title) => {
+    const newTask = {
+      id: Date.now().toString(),
+      title,
+      completed: false
+    };
+    setTasks(prev => [...prev, newTask]);
+  };
 
-   const toggleTask = (id) => {
-        setTasks((prev) => prev.map((task) => task.id === id
-        ? {...task, completed: !task.completed}
-        : task
+  const toggleTask = (id) => {
+    setTasks(prev =>
+      prev.map(task =>
+        task.id === id
+          ? { ...task, completed: !task.completed }
+          : task
       )
-    )
-   }
+    );
+  };
 
-   const deleteTask = (id) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id))
-   }
+  const deleteTask = (id) => {
+    setTasks(prev => prev.filter(task => task.id !== id));
+  };
+
+  const updateTask = (id, newTitle) => {
+    setTasks(prev =>
+      prev.map(task =>
+        task.id === id ? { ...task, title: newTitle } : task
+      )
+    );
+  };
+
+  const reorderTasks = (newTasks) => {
+    setTasks(newTasks);
+  };
 
   return (
-    <TaskContext.Provider value={{ tasks, addTask, toggleTask, deleteTask }}>
+    <TaskContext.Provider
+      value={{
+        tasks,
+        addTask,
+        toggleTask,
+        deleteTask,
+        updateTask,
+        reorderTasks
+      }}
+    >
       {children}
     </TaskContext.Provider>
   );
