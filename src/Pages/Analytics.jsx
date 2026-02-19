@@ -1,182 +1,131 @@
 import { useContext } from "react";
 import { TaskContext } from "../Context/TaskContext";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-export default function Analytics() {
+const Analytics = () => {
   const { tasks } = useContext(TaskContext);
 
-  // Today's date (local)
-  const today = new Date().toDateString();
-
-  // Tasks created today
-  const createdToday = tasks.filter(
-    task =>
-      task.createdAt &&
-      new Date(task.createdAt).toDateString() === today
-  ).length;
-
-  // Tasks completed today
-  const completedToday = tasks.filter(
-    task =>
-      task.completedAt &&
-      new Date(task.completedAt).toDateString() === today
-  ).length;
-
-
+  const completed = tasks.filter(t => t.completed).length;
+  const pending = tasks.filter(t => !t.completed).length;
   const total = tasks.length;
-  const completed = tasks.filter((t) => t.completed).length;
-  const pending = total - completed;
-  const completionRate =
-    total === 0 ? 0 : Math.round((completed / total) * 100);
+  const completionRate = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   const pieData = [
     { name: "Completed", value: completed },
     { name: "Pending", value: pending },
   ];
 
-  const barData = [
-    { name: "Completed", tasks: completed },
-    { name: "Pending", tasks: pending },
+  const priorityData = [
+    { name: "High", value: tasks.filter(t => t.priority === "High").length },
+    { name: "Medium", value: tasks.filter(t => t.priority === "Medium").length },
+    { name: "Low", value: tasks.filter(t => t.priority === "Low").length },
   ];
 
-  const last7Days = Array.from({ length: 7 }).map((_, i) => {
-  const date = new Date();
-  date.setDate(date.getDate() - (6 - i));
-  return date.toDateString();
-});
+  const categoryData = ["Work", "Personal", "College", "Health", "General"].map(cat => ({
+    name: cat,
+    value: tasks.filter(t => t.category === cat).length,
+  })).filter(d => d.value > 0);
 
-// Completed tasks for each of last 7 days
-const weeklyCompletedData = last7Days.map((day) => {
-  return {
-    day: day.slice(0, 3), // Mon, Tue, etc
-    completed: tasks.filter(
-      (task) =>
-        task.completedAt &&
-        new Date(task.completedAt).toDateString() === day
-    ).length,
-  };
-});
+  const overdueCount = tasks.filter(t =>
+    t.dueDate &&
+    new Date(t.dueDate) < new Date(new Date().toDateString()) &&
+    !t.completed
+  ).length;
 
-
-
+  const COLORS = ["#7c3aed", "#1e1e2e"];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8">
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Analytics</h1>
+        <p className="text-sm text-gray-500 mt-1">Track your productivity</p>
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "Total Tasks", value: total },
+          { label: "Completed", value: completed },
+          { label: "Pending", value: pending },
+          { label: "Overdue", value: overdueCount },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+            <p className="text-xs text-gray-500">{stat.label}</p>
+            <p className="text-3xl font-semibold text-white mt-1">{stat.value}</p>
+          </div>
+        ))}
+      </div>
 
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Total Tasks</h3>
-          <p className="text-2xl font-bold mt-2">{total}</p>
+      {/* Completion Rate */}
+      <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
+        <p className="text-sm text-gray-400 mb-3">Completion Rate</p>
+        <div className="flex items-center gap-4">
+          <div className="flex-1 bg-[#1e1e1e] rounded-full h-2">
+            <div
+              className="bg-violet-600 h-2 rounded-full transition-all"
+              style={{ width: `${completionRate}%` }}
+            />
+          </div>
+          <span className="text-sm text-white font-medium">{completionRate}%</span>
         </div>
-
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Completed</h3>
-          <p className="text-2xl font-bold mt-2">{completed}</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Pending</h3>
-          <p className="text-2xl font-bold mt-2">{pending}</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Completion %</h3>
-          <p className="text-2xl font-bold mt-2">{completionRate}%</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Created Today</h3>
-          <p className="text-2xl font-bold mt-2">{createdToday}</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-md p-5 rounded-2xl border border-white/10">
-          <h3 className="text-sm text-gray-400">Completed Today</h3>
-          <p className="text-2xl font-bold mt-2">{completedToday}</p>
-        </div>
-
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-6">
 
         {/* Pie Chart */}
-        <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10">
-          <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  outerRadius={100}
-                  label
-                  isAnimationActive={true}
-                  animationDuration={2000}
-                >
-                  <Cell fill="#10B981" />
-                  <Cell fill="#F43F5E" />
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
+          <p className="text-sm text-gray-400 mb-4">Tasks Overview</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value">
+                {pieData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "8px" }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 justify-center mt-2">
+            <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-600 inline-block"></span>Completed</span>
+            <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#1e1e2e] border border-gray-600 inline-block"></span>Pending</span>
           </div>
         </div>
 
-        {/* Bar Chart */}
-        <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10">
-          <h2 className="text-lg font-semibold mb-4">Productivity Overview</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="name" stroke="#ccc" />
-                <YAxis stroke="#ccc" />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="tasks" fill="#6366F1" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Priority Chart */}
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
+          <p className="text-sm text-gray-400 mb-4">Tasks by Priority</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={priorityData}>
+              <XAxis dataKey="name" stroke="#4b5563" tick={{ fontSize: 12 }} />
+              <YAxis stroke="#4b5563" tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "8px" }} />
+              <Bar dataKey="value" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
       </div>
 
-      <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 mt-6">
-  <h2 className="text-lg font-semibold mb-4">
-    Weekly Completed Tasks
-  </h2>
-
-  <div className="h-72">
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={weeklyCompletedData}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-        <XAxis dataKey="day" stroke="#ccc" />
-        <YAxis stroke="#ccc" />
-        <Tooltip />
-        <Bar
-          dataKey="completed"
-          fill="#22c55e"
-          radius={[6, 6, 0, 0]}
-        />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-</div>
+      {/* Category Breakdown */}
+      {categoryData.length > 0 && (
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
+          <p className="text-sm text-gray-400 mb-4">Tasks by Category</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={categoryData}>
+              <XAxis dataKey="name" stroke="#4b5563" tick={{ fontSize: 12 }} />
+              <YAxis stroke="#4b5563" tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "8px" }} />
+              <Bar dataKey="value" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
     </div>
   );
-}
+};
+
+export default Analytics;
