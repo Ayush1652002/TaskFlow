@@ -10,15 +10,14 @@ import {
 
 const Dashboard = () => {
   const { tasks, addTask, reorderTasks } = useContext(TaskContext);
-
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all");
-
   const [priority, setPriority] = useState("Medium");
+  const [search, setSearch] = useState("");
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
-     addTask({ title: newTask,priority: priority,});
+    addTask({ title: newTask, priority: priority, });
     setNewTask("");
   };
 
@@ -26,10 +25,19 @@ const Dashboard = () => {
   const pendingCount = tasks.length - completedCount;
 
   const filteredTasks = tasks.filter(task => {
-    if (filter === "completed") return task.completed;
-    if (filter === "pending") return !task.completed;
-    return true;
-  });
+  const matchesSearch = task.title
+    .toLowerCase()
+    .includes(search.toLowerCase());
+
+  if (filter === "completed")
+    return task.completed && matchesSearch;
+
+  if (filter === "pending")
+    return !task.completed && matchesSearch;
+
+  return matchesSearch;
+});
+
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
@@ -57,15 +65,15 @@ const Dashboard = () => {
           className="flex-1 bg-slate-800 border border-slate-700 px-5 py-3 rounded-2xl outline-none"
         />
 
-<select
-  value={priority}
-  onChange={(e) => setPriority(e.target.value)}
-  className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-white"
->
-  <option value="Low">Low</option>
-  <option value="Medium">Medium</option>
-  <option value="High">High</option>
-</select>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-white"
+        >
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
 
         <button
           onClick={handleAdd}
@@ -99,22 +107,32 @@ const Dashboard = () => {
         ))}
       </div>
 
+      
+
       {/* Filters */}
       <div className="flex gap-4 mb-10">
         {["all", "completed", "pending"].map(type => (
           <button
             key={type}
             onClick={() => setFilter(type)}
-            className={`px-6 py-2 rounded-xl font-medium transition ${
-              filter === type
+            className={`px-6 py-2 rounded-xl font-medium transition ${filter === type
                 ? "bg-blue-600 shadow-lg"
                 : "bg-slate-800 hover:bg-slate-700 text-gray-300"
-            }`}
+              }`}
           >
             {type.charAt(0).toUpperCase() + type.slice(1)}
           </button>
         ))}
       </div>
+
+      {/* Search Input */}
+      <input
+        type="text"
+        placeholder="Search tasks..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white w-64 mb-6"
+      />
 
       {/* Drag Area */}
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
