@@ -17,12 +17,13 @@ const TaskProvider = ({ children }) => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-  const addTask = ({ title, priority }) => {
+  const addTask = ({ title, priority, dueDate }) => {
   const newTask = {
     id: Date.now().toString(),
     title,
     completed: false,
     priority: priority || "Medium",
+    dueDate: dueDate || null,
     createdAt: new Date().toISOString(),
     completedAt: null,
   };

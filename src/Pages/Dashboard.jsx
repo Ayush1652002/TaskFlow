@@ -14,11 +14,13 @@ const Dashboard = () => {
   const [filter, setFilter] = useState("all");
   const [priority, setPriority] = useState("Medium");
   const [search, setSearch] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
-    addTask({ title: newTask, priority: priority, });
+    addTask({ title: newTask, priority: priority, dueDate: newDueDate});
     setNewTask("");
+    setNewDueDate("");
   };
 
   const completedCount = tasks.filter(t => t.completed).length;
@@ -74,6 +76,13 @@ const Dashboard = () => {
           <option value="Medium">Medium</option>
           <option value="High">High</option>
         </select>
+
+        <input
+  type="date"
+  value={newDueDate}
+  onChange={(e) => setNewDueDate(e.target.value)}
+  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+/>
 
         <button
           onClick={handleAdd}

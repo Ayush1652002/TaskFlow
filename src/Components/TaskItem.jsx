@@ -80,6 +80,16 @@ const TaskItem = ({ task }) => {
               >
                 {task.priority}
               </span>
+
+              {task.dueDate && (
+  <span className={`text-xs px-2 py-1 rounded-full ${
+    new Date(task.dueDate) < new Date(new Date().toDateString()) && !task.completed
+      ? "bg-red-500 text-white"
+      : "bg-slate-600 text-gray-300"
+  }`}>
+    📅 {task.dueDate}
+  </span>
+)}
             </>
           )}
         </div>
