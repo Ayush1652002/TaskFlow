@@ -1,126 +1,114 @@
-import { useState, useContext } from "react";
+import { useContext, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TaskContext } from "../Context/TaskContext";
 
 const TaskItem = ({ task }) => {
-  const { toggleTask, deleteTask, editTask } = useContext(TaskContext);
-
+  const { toggleTask, deleteTask, updateTask } = useContext(TaskContext);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(task.title);
 
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: task.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
 
   const saveEdit = () => {
-    if (!editValue.trim()) return;
-    editTask(task.id, editValue);
+    updateTask(task.id, editValue);
     setIsEditing(false);
   };
+
+  const priorityColors = {
+    High: "text-red-400 bg-red-400/10",
+    Medium: "text-yellow-400 bg-yellow-400/10",
+    Low: "text-green-400 bg-green-400/10",
+  };
+
+  const isOverdue = task.dueDate &&
+    new Date(task.dueDate) < new Date(new Date().toDateString()) &&
+    !task.completed;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      className="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center justify-between shadow-md"
+      className="flex items-center gap-4 bg-[#141414] border border-[#1e1e1e] hover:border-[#2e2e2e] rounded-xl px-4 py-3 transition group"
     >
-      {/* Left Section */}
-      <div className="flex items-center gap-3 flex-1">
-        {/* Drag Handle */}
-        <div
-          {...listeners}
-          className="cursor-grab text-gray-400 hover:text-white"
-        >
-          ☰
-        </div>
+      {/* Drag Handle */}
+      <span
+        {...attributes}
+        {...listeners}
+        className="text-gray-600 cursor-grab hover:text-gray-400 transition"
+      >
+        ⠿
+      </span>
 
-        {/* Status Dot */}
-        <div
-          className={`w-3 h-3 rounded-full ${
-            task.completed ? "bg-green-400" : "bg-gray-400"
+      {/* Checkbox */}
+      <button
+        onClick={() => toggleTask(task.id)}
+        className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition ${task.completed
+            ? "bg-violet-600 border-violet-600"
+            : "border-gray-600 hover:border-violet-500"
           }`}
-        />
+      />
 
-        {/* Title + Priority */}
-        <div className="flex items-center">
-          {isEditing ? (
-            <input
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={saveEdit}
-              onKeyDown={(e) => e.key === "Enter" && saveEdit()}
-              className="bg-slate-700 text-white px-3 py-1 rounded-lg outline-none"
-              autoFocus
-            />
-          ) : (
-            <>
-              <span
-                className={`text-white ${
-                  task.completed ? "line-through text-gray-500" : ""
-                }`}
-              >
-                {task.title}
-              </span>
-
-              {/* Priority Badge */}
-              <span
-                className={`ml-3 px-2 py-1 text-xs rounded-md ${
-                  task.priority === "High"
-                    ? "bg-red-500/20 text-red-400"
-                    : task.priority === "Medium"
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : "bg-green-500/20 text-green-400"
-                }`}
-              >
-                {task.priority}
-              </span>
-
-              {task.dueDate && (
-  <span className={`text-xs px-2 py-1 rounded-full ${
-    new Date(task.dueDate) < new Date(new Date().toDateString()) && !task.completed
-      ? "bg-red-500 text-white"
-      : "bg-slate-600 text-gray-300"
-  }`}>
-    📅 {task.dueDate}
-  </span>
-)}
-            </>
-          )}
-        </div>
+      {/* Title */}
+      <div className="flex-1">
+        {isEditing ? (
+          <input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+            onBlur={saveEdit}
+            autoFocus
+            className="bg-transparent text-sm text-white outline-none w-full"
+          />
+        ) : (
+          <div className="flex flex-col">
+            <span className={`text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-200"}`}>
+              {task.title}
+            </span>
+            {task.description && (
+              <span className="text-xs text-gray-500 mt-0.5">{task.description}</span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Right Section Buttons */}
+      {/* Badges */}
       <div className="flex items-center gap-2">
-        {/* Complete */}
-        <button
-          onClick={() => toggleTask(task.id)}
-          className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-lg text-white"
-        >
-          ✓
-        </button>
+        <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${priorityColors[task.priority]}`}>
+          {task.priority}
+        </span>
 
-        {/* Edit */}
+        {task.category && task.category !== "General" && (
+          <span className="text-xs px-2 py-0.5 rounded-md text-violet-400 bg-violet-400/10">
+            {task.category}
+          </span>
+        )}
+
+        {task.dueDate && (
+          <span className={`text-xs px-2 py-0.5 rounded-md ${isOverdue ? "text-red-400 bg-red-400/10" : "text-gray-400 bg-white/5"
+            }`}>
+            📅 {task.dueDate}
+          </span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
         <button
           onClick={() => setIsEditing(true)}
-          className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-lg text-white"
+          className="text-xs px-2 py-1 rounded-lg bg-[#1e1e1e] text-gray-400 hover:text-white transition"
         >
-          ✎
+          Edit
         </button>
-
-        {/* Delete */}
         <button
           onClick={() => deleteTask(task.id)}
-          className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg text-white"
+          className="text-xs px-2 py-1 rounded-lg bg-[#1e1e1e] text-red-400 hover:text-red-300 transition"
         >
-          ✕
+          Delete
         </button>
       </div>
+
     </div>
   );
 };

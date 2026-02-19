@@ -2,158 +2,162 @@ import { useContext, useState } from "react";
 import { TaskContext } from "../Context/TaskContext";
 import TaskItem from "../Components/TaskItem";
 import { DndContext, closestCenter } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  arrayMove
-} from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 const Dashboard = () => {
   const { tasks, addTask, reorderTasks } = useContext(TaskContext);
   const [newTask, setNewTask] = useState("");
-  const [filter, setFilter] = useState("all");
   const [priority, setPriority] = useState("Medium");
-  const [search, setSearch] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("General");
+
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
-    addTask({ title: newTask, priority: priority, dueDate: newDueDate});
+    addTask({ title: newTask, priority, dueDate: newDueDate,description,category });
     setNewTask("");
     setNewDueDate("");
+    setPriority("Medium");
+    setDescription("");
+    setCategory("General")
   };
 
-  const completedCount = tasks.filter(t => t.completed).length;
-  const pendingCount = tasks.length - completedCount;
-
   const filteredTasks = tasks.filter(task => {
-  const matchesSearch = task.title
-    .toLowerCase()
-    .includes(search.toLowerCase());
+    const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase());
+    if (filter === "completed") return task.completed && matchesSearch;
+    if (filter === "pending") return !task.completed && matchesSearch;
+    return matchesSearch;
+  });
 
-  if (filter === "completed")
-    return task.completed && matchesSearch;
-
-  if (filter === "pending")
-    return !task.completed && matchesSearch;
-
-  return matchesSearch;
-});
-
+  const completedCount = tasks.filter(t => t.completed).length;
+  const pendingCount = tasks.filter(t => !t.completed).length;
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
     const oldIndex = tasks.findIndex(t => t.id === active.id);
     const newIndex = tasks.findIndex(t => t.id === over.id);
-
-    reorderTasks(arrayMove(tasks, oldIndex, newIndex));
+    const reordered = [...tasks];
+    reordered.splice(newIndex, 0, reordered.splice(oldIndex, 1)[0]);
+    reorderTasks(reordered);
   };
 
   return (
-    <div>
+    <div className="space-y-8">
 
-      <h2 className="text-4xl font-semibold mb-10">
-        Dashboard
-      </h2>
-
-      {/* Input */}
-      <div className="flex gap-4 mb-12">
-        <input
-          value={newTask}
-          onChange={(e) => setNewTask(e.target.value)}
-          placeholder="Enter task..."
-          className="flex-1 bg-slate-800 border border-slate-700 px-5 py-3 rounded-2xl outline-none"
-        />
-
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-white"
-        >
-          <option value="Low">Low</option>
-          <option value="Medium">Medium</option>
-          <option value="High">High</option>
-        </select>
-
-        <input
-  type="date"
-  value={newDueDate}
-  onChange={(e) => setNewDueDate(e.target.value)}
-  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-/>
-
-        <button
-          onClick={handleAdd}
-          className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-2xl font-medium transition"
-        >
-          Add
-        </button>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage and track your tasks</p>
       </div>
 
+      {/* Add Task */}
+      <div className="flex flex-col gap-3 bg-[#141414] border border-[#1e1e1e] rounded-xl p-4">
+  <input
+    type="text"
+    placeholder="Add a new task..."
+    value={newTask}
+    onChange={(e) => setNewTask(e.target.value)}
+    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+    className="bg-transparent text-sm text-white placeholder-gray-500 outline-none"
+  />
+  <input
+    type="text"
+    placeholder="Add description (optional)..."
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+    className="bg-transparent text-xs text-gray-400 placeholder-gray-600 outline-none"
+  />
+  <div className="flex gap-3 items-center">
+    <select
+      value={priority}
+      onChange={(e) => setPriority(e.target.value)}
+      className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+    >
+      <option>Low</option>
+      <option>Medium</option>
+      <option>High</option>
+    </select>
+    
+    <select
+  value={category}
+  onChange={(e) => setCategory(e.target.value)}
+  className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+>
+  <option>General</option>
+  <option>Work</option>
+  <option>Personal</option>
+  <option>College</option>
+  <option>Health</option>
+</select>
+
+    <input
+      type="date"
+      value={newDueDate}
+      onChange={(e) => setNewDueDate(e.target.value)}
+      className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+    />
+    <button
+      onClick={handleAdd}
+      className="ml-auto bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 py-2 rounded-lg transition"
+    >
+      Add Task
+    </button>
+  </div>
+</div>
+
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-8 mb-14">
+      <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Total Tasks", value: tasks.length },
           { label: "Completed", value: completedCount },
-          { label: "Pending", value: pendingCount }
-        ].map((card, i) => (
-          <div
-            key={i}
-            className="bg-gradient-to-br from-slate-800/70 to-slate-900/70
-            border border-slate-700/60 p-8 rounded-3xl
-            shadow-xl hover:-translate-y-1 hover:shadow-2xl
-            transition-all duration-300"
-          >
-            <p className="text-slate-400 text-sm mb-3">
-              {card.label}
-            </p>
-            <p className="text-4xl font-bold">
-              {card.value}
-            </p>
+          { label: "Pending", value: pendingCount },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+            <p className="text-xs text-gray-500">{stat.label}</p>
+            <p className="text-3xl font-semibold text-white mt-1">{stat.value}</p>
           </div>
         ))}
       </div>
 
-      
-
       {/* Filters */}
-      <div className="flex gap-4 mb-10">
-        {["all", "completed", "pending"].map(type => (
+      <div className="flex gap-2">
+        {["all", "completed", "pending"].map((f) => (
           <button
-            key={type}
-            onClick={() => setFilter(type)}
-            className={`px-6 py-2 rounded-xl font-medium transition ${filter === type
-                ? "bg-blue-600 shadow-lg"
-                : "bg-slate-800 hover:bg-slate-700 text-gray-300"
-              }`}
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`text-sm px-4 py-1.5 rounded-lg transition capitalize ${
+              filter === f
+                ? "bg-violet-600 text-white"
+                : "bg-[#1e1e1e] text-gray-400 hover:text-white"
+            }`}
           >
-            {type.charAt(0).toUpperCase() + type.slice(1)}
+            {f}
           </button>
         ))}
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="ml-auto bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-1.5 outline-none placeholder-gray-600"
+        />
       </div>
 
-      {/* Search Input */}
-      <input
-        type="text"
-        placeholder="Search tasks..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white w-64 mb-6"
-      />
-
-      {/* Drag Area */}
+      {/* Task List */}
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={tasks.map(task => task.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <ul className="space-y-5">
+        <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2">
+            {filteredTasks.length === 0 && (
+              <p className="text-gray-600 text-sm text-center py-10">No tasks found.</p>
+            )}
             {filteredTasks.map(task => (
               <TaskItem key={task.id} task={task} />
             ))}
-          </ul>
+          </div>
         </SortableContext>
       </DndContext>
 
