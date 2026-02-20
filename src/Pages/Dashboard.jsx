@@ -3,6 +3,7 @@ import { TaskContext } from "../Context/TaskContext";
 import TaskItem from "../Components/TaskItem";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import BoardView from "../Components/BoardView";
 
 const Dashboard = () => {
   const { tasks, addTask, reorderTasks } = useContext(TaskContext);
@@ -13,11 +14,12 @@ const Dashboard = () => {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("General");
+  const [view, setView] = useState("list");
 
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
-    addTask({ title: newTask, priority, dueDate: newDueDate,description,category });
+    addTask({ title: newTask, priority, dueDate: newDueDate, description, category });
     setNewTask("");
     setNewDueDate("");
     setPriority("Medium");
@@ -49,65 +51,67 @@ const Dashboard = () => {
     <div className="space-y-8">
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage and track your tasks</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage and track your tasks</p>
+        </div>
       </div>
 
       {/* Add Task */}
       <div className="flex flex-col gap-3 bg-[#141414] border border-[#1e1e1e] rounded-xl p-4">
-  <input
-    type="text"
-    placeholder="Add a new task..."
-    value={newTask}
-    onChange={(e) => setNewTask(e.target.value)}
-    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-    className="bg-transparent text-sm text-white placeholder-gray-500 outline-none"
-  />
-  <input
-    type="text"
-    placeholder="Add description (optional)..."
-    value={description}
-    onChange={(e) => setDescription(e.target.value)}
-    className="bg-transparent text-xs text-gray-400 placeholder-gray-600 outline-none"
-  />
-  <div className="flex gap-3 items-center">
-    <select
-      value={priority}
-      onChange={(e) => setPriority(e.target.value)}
-      className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
-    >
-      <option>Low</option>
-      <option>Medium</option>
-      <option>High</option>
-    </select>
-    
-    <select
-  value={category}
-  onChange={(e) => setCategory(e.target.value)}
-  className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
->
-  <option>General</option>
-  <option>Work</option>
-  <option>Personal</option>
-  <option>College</option>
-  <option>Health</option>
-</select>
+        <input
+          type="text"
+          placeholder="Add a new task..."
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          className="bg-transparent text-sm text-white placeholder-gray-500 outline-none"
+        />
+        <input
+          type="text"
+          placeholder="Add description (optional)..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="bg-transparent text-xs text-gray-400 placeholder-gray-600 outline-none"
+        />
+        <div className="flex gap-3 items-center">
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+          >
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
 
-    <input
-      type="date"
-      value={newDueDate}
-      onChange={(e) => setNewDueDate(e.target.value)}
-      className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
-    />
-    <button
-      onClick={handleAdd}
-      className="ml-auto bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 py-2 rounded-lg transition"
-    >
-      Add Task
-    </button>
-  </div>
-</div>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+          >
+            <option>General</option>
+            <option>Work</option>
+            <option>Personal</option>
+            <option>College</option>
+            <option>Health</option>
+          </select>
+
+          <input
+            type="date"
+            value={newDueDate}
+            onChange={(e) => setNewDueDate(e.target.value)}
+            className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+          />
+          <button
+            onClick={handleAdd}
+            className="ml-auto bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 py-2 rounded-lg transition"
+          >
+            Add Task
+          </button>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -123,17 +127,41 @@ const Dashboard = () => {
         ))}
       </div>
 
+      {/* View Toggle */}
+<div className="flex gap-2">
+  <button
+    onClick={() => setView("list")}
+    className={`text-sm px-4 py-1.5 rounded-lg transition ${
+      view === "list"
+        ? "bg-violet-600 text-white"
+        : "bg-[#1e1e1e] text-gray-400 hover:text-white"
+    }`}
+  >
+    📋 List
+  </button>
+  <button
+    onClick={() => setView("board")}
+    className={`text-sm px-4 py-1.5 rounded-lg transition ${
+      view === "board"
+        ? "bg-violet-600 text-white"
+        : "bg-[#1e1e1e] text-gray-400 hover:text-white"
+    }`}
+  >
+    📌 Board
+  </button>
+</div>
+
       {/* Filters */}
-      <div className="flex gap-2">
+      {view === "list" && (
+         <div className="flex gap-2">
         {["all", "completed", "pending"].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`text-sm px-4 py-1.5 rounded-lg transition capitalize ${
-              filter === f
+            className={`text-sm px-4 py-1.5 rounded-lg transition capitalize ${filter === f
                 ? "bg-violet-600 text-white"
                 : "bg-[#1e1e1e] text-gray-400 hover:text-white"
-            }`}
+              }`}
           >
             {f}
           </button>
@@ -146,21 +174,28 @@ const Dashboard = () => {
           className="ml-auto bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-1.5 outline-none placeholder-gray-600"
         />
       </div>
+  
+      )}
+
+     
 
       {/* Task List */}
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {filteredTasks.length === 0 && (
-              <p className="text-gray-600 text-sm text-center py-10">No tasks found.</p>
-            )}
-            {filteredTasks.map(task => (
-              <TaskItem key={task.id} task={task} />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-
+      {view === "list" ? (
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {filteredTasks.length === 0 && (
+                <p className="text-gray-600 text-sm text-center py-10">No tasks found.</p>
+              )}
+              {filteredTasks.map(task => (
+                <TaskItem key={task.id} task={task} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <BoardView />
+      )}
     </div>
   );
 };

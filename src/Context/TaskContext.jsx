@@ -22,6 +22,7 @@ const TaskProvider = ({ children }) => {
     id: Date.now().toString(),
     title,
     completed: false,
+    status: "todo",
     priority: priority || "Medium",
     dueDate: dueDate || null,
     description: description || "",
@@ -67,6 +68,12 @@ const TaskProvider = ({ children }) => {
     setTasks(newTasks);
   };
 
+  const updateTaskStatus = (id, status) => {
+  setTasks(prev => prev.map(task =>
+    task.id === id ? { ...task, status } : task
+  ));
+};
+
   return (
     <TaskContext.Provider
       value={{
@@ -75,7 +82,8 @@ const TaskProvider = ({ children }) => {
         toggleTask,
         deleteTask,
         updateTask,
-        reorderTasks
+        reorderTasks,
+        updateTaskStatus
       }}
     >
       {children}
