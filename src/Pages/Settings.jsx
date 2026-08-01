@@ -3,10 +3,11 @@ import { useContext } from "react";
 import { TaskContext } from "../Context/TaskContext";
 
 const Settings = () => {
-  const { tasks, reorderTasks } = useContext(TaskContext);
   const [userName, setUserName] = useState("");
   const [defaultPriority, setDefaultPriority] = useState("Medium");
   const [saved, setSaved] = useState(false);
+  const { tasks, clearAllTasks } = useContext(TaskContext);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
     const name = localStorage.getItem("userName");
@@ -22,11 +23,10 @@ const Settings = () => {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleClearTasks = () => {
-    if (window.confirm("Are you sure you want to delete all tasks?")) {
-      reorderTasks([]);
-    }
-  };
+
+const handleClearTasks = () => {
+  if (window.confirm("Are you sure?")) clearAllTasks();
+};
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -81,12 +81,24 @@ const Settings = () => {
       <div className="bg-[#141414] border border-red-900/30 rounded-xl p-6 space-y-4">
         <h2 className="text-sm font-medium text-red-400">Danger Zone</h2>
         <p className="text-xs text-gray-500">This will permanently delete all your tasks.</p>
-        <button
-          onClick={handleClearTasks}
-          className="bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm px-4 py-2 rounded-lg transition"
-        >
-          Clear All Tasks
-        </button>
+        {!confirmingClear ? (
+  <button onClick={() => setConfirmingClear(true)}
+    className="bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm px-4 py-2 rounded-lg transition">
+    Clear All Tasks
+  </button>
+) : (
+  <div className="flex items-center gap-3">
+    <p className="text-xs text-red-400">This cannot be undone.</p>
+    <button onClick={() => { handleClearTasks(); setConfirmingClear(false); }}
+      className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg">
+      Confirm Delete
+    </button>
+    <button onClick={() => setConfirmingClear(false)}
+      className="text-xs px-3 py-1.5 bg-[#1e1e1e] text-gray-400 rounded-lg">
+      Cancel
+    </button>
+  </div>
+)}
       </div>
 
     </div>

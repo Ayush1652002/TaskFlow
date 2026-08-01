@@ -4,11 +4,18 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 
 const Analytics = () => {
   const { tasks } = useContext(TaskContext);
+  const safeTasks = tasks || [];
 
-  const completed = tasks.filter(t => t.completed).length;
-  const pending = tasks.filter(t => !t.completed).length;
-  const total = tasks.length;
+  const completed = safeTasks.filter(t => t.completed).length;
+  const pending = safeTasks.filter(t => !t.completed).length;
+  const total = safeTasks.length;
   const completionRate = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  const overdueCount = safeTasks.filter(t =>
+    t.dueDate &&
+    new Date(t.dueDate) < new Date(new Date().toDateString()) &&
+    !t.completed
+  ).length;
 
   const pieData = [
     { name: "Completed", value: completed },
@@ -16,66 +23,87 @@ const Analytics = () => {
   ];
 
   const priorityData = [
-    { name: "High", value: tasks.filter(t => t.priority === "High").length },
-    { name: "Medium", value: tasks.filter(t => t.priority === "Medium").length },
-    { name: "Low", value: tasks.filter(t => t.priority === "Low").length },
+    { name: "High", value: safeTasks.filter(t => t.priority === "High").length },
+    { name: "Medium", value: safeTasks.filter(t => t.priority === "Medium").length },
+    { name: "Low", value: safeTasks.filter(t => t.priority === "Low").length },
   ];
 
   const categoryData = ["Work", "Personal", "College", "Health", "General"].map(cat => ({
     name: cat,
-    value: tasks.filter(t => t.category === cat).length,
+    value: safeTasks.filter(t => t.category === cat).length,
   })).filter(d => d.value > 0);
 
-  const overdueCount = tasks.filter(t =>
-    t.dueDate &&
-    new Date(t.dueDate) < new Date(new Date().toDateString()) &&
-    !t.completed
-  ).length;
-
   const COLORS = ["#7c3aed", "#1e1e2e"];
+
+  const completionColor = completionRate >= 70 ? "text-green-400" :
+    completionRate >= 30 ? "text-yellow-400" : "text-red-400";
+
+  const completionBarColor = completionRate >= 70 ? "bg-green-500" :
+    completionRate >= 30 ? "bg-yellow-500" : "bg-red-500";
+
+  if (total === 0) return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Analytics</h1>
+        <p className="text-sm text-gray-500 mt-1">Track your productivity</p>
+      </div>
+      <div className="flex flex-col items-center justify-center py-24 space-y-3">
+        <div className="w-12 h-12 rounded-xl bg-[#1e1e1e] flex items-center justify-center text-2xl">📊</div>
+        <p className="text-sm text-gray-400">No data yet</p>
+        <p className="text-xs text-gray-600">Add some tasks to see your analytics</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-8">
 
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-white">Analytics</h1>
         <p className="text-sm text-gray-500 mt-1">Track your productivity</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: "Total Tasks", value: total },
-          { label: "Completed", value: completed },
-          { label: "Pending", value: pending },
-          { label: "Overdue", value: overdueCount },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
-            <p className="text-xs text-gray-500">{stat.label}</p>
-            <p className="text-3xl font-semibold text-white mt-1">{stat.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+          <p className="text-xs text-gray-500">Total Tasks</p>
+          <p className="text-3xl font-semibold text-white mt-1">{total}</p>
+        </div>
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+          <p className="text-xs text-gray-500">Completed</p>
+          <p className="text-3xl font-semibold text-green-400 mt-1">{completed}</p>
+        </div>
+        <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-5">
+          <p className="text-xs text-gray-500">Pending</p>
+          <p className="text-3xl font-semibold text-yellow-400 mt-1">{pending}</p>
+        </div>
+        <div className="bg-[#141414] border border-red-900/30 rounded-xl p-5">
+          <p className="text-xs text-gray-500">Overdue</p>
+          <p className="text-3xl font-semibold text-red-400 mt-1">{overdueCount}</p>
+        </div>
       </div>
 
       {/* Completion Rate */}
       <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
-        <p className="text-sm text-gray-400 mb-3">Completion Rate</p>
-        <div className="flex items-center gap-4">
-          <div className="flex-1 bg-[#1e1e1e] rounded-full h-2">
-            <div
-              className="bg-violet-600 h-2 rounded-full transition-all"
-              style={{ width: `${completionRate}%` }}
-            />
-          </div>
-          <span className="text-sm text-white font-medium">{completionRate}%</span>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-gray-400">Completion Rate</p>
+          <span className={`text-sm font-semibold ${completionColor}`}>{completionRate}%</span>
         </div>
+        <div className="flex-1 bg-[#1e1e1e] rounded-full h-2">
+          <div
+            className={`${completionBarColor} h-2 rounded-full transition-all duration-500`}
+            style={{ width: `${completionRate}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-600 mt-2">
+          {completionRate >= 70 ? "Great work! Keep it up 🎉" :
+           completionRate >= 30 ? "Good progress, keep going 💪" :
+           "You have a lot of pending tasks 📋"}
+        </p>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-2 gap-6">
-
-        {/* Pie Chart */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
           <p className="text-sm text-gray-400 mb-4">Tasks Overview</p>
           <ResponsiveContainer width="100%" height={200}>
@@ -89,12 +117,15 @@ const Analytics = () => {
             </PieChart>
           </ResponsiveContainer>
           <div className="flex gap-4 justify-center mt-2">
-            <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-600 inline-block"></span>Completed</span>
-            <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#1e1e2e] border border-gray-600 inline-block"></span>Pending</span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-violet-600 inline-block" />Completed
+            </span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-[#1e1e2e] border border-gray-600 inline-block" />Pending
+            </span>
           </div>
         </div>
 
-        {/* Priority Chart */}
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
           <p className="text-sm text-gray-400 mb-4">Tasks by Priority</p>
           <ResponsiveContainer width="100%" height={200}>
@@ -106,10 +137,8 @@ const Analytics = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
       </div>
 
-      {/* Category Breakdown */}
       {categoryData.length > 0 && (
         <div className="bg-[#141414] border border-[#1e1e1e] rounded-xl p-6">
           <p className="text-sm text-gray-400 mb-4">Tasks by Category</p>
@@ -127,5 +156,4 @@ const Analytics = () => {
     </div>
   );
 };
-
 export default Analytics;

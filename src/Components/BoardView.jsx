@@ -44,7 +44,7 @@ const BoardView = () => {
           )}
 
           {getColumnTasks(col.id).map(task => (
-            <div key={task.id} className="bg-[#0f0f0f] border border-[#1e1e1e] hover:border-[#2e2e2e] rounded-lg p-3 space-y-2 transition">
+            <div key={task._id} className="bg-[#0f0f0f] border border-[#1e1e1e] hover:border-[#2e2e2e] rounded-lg p-3 space-y-2 transition">
 
               {/* Title */}
               <p className={`text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-200"}`}>
@@ -81,7 +81,7 @@ const BoardView = () => {
               <div className="flex gap-1 flex-wrap pt-1">
                 {col.id !== "todo" && (
                   <button
-                    onClick={() => updateTaskStatus(task.id, "todo")}
+                    onClick={() => updateTaskStatus(task._id, "todo")}
                     className="text-xs px-2 py-1 rounded-md bg-[#1e1e1e] text-gray-400 hover:text-white transition"
                   >
                     Todo
@@ -89,7 +89,7 @@ const BoardView = () => {
                 )}
                 {col.id !== "inprogress" && !task.completed && (
                   <button
-                    onClick={() => updateTaskStatus(task.id, "inprogress")}
+                    onClick={() => updateTaskStatus(task._id, "inprogress")}
                     className="text-xs px-2 py-1 rounded-md bg-[#1e1e1e] text-yellow-400 hover:text-yellow-300 transition"
                   >
                     In Progress
@@ -98,8 +98,8 @@ const BoardView = () => {
                 {col.id !== "done" && (
   <button
     onClick={() => {
-      updateTaskStatus(task.id, "done");
-      if (!task.completed) toggleTask(task.id);
+      updateTaskStatus(task._id, "done");
+      if (!task.completed) toggleTask(task._id);
     }}
     className="text-xs px-2 py-1 rounded-md bg-[#1e1e1e] text-violet-400 hover:text-violet-300 transition"
   >
@@ -107,7 +107,7 @@ const BoardView = () => {
   </button>
 )}
                 <button
-                  onClick={() => deleteTask(task.id)}
+                  onClick={() => deleteTask(task._id)}
                   className="text-xs px-2 py-1 rounded-md bg-[#1e1e1e] text-red-400 hover:text-red-300 transition ml-auto"
                 >
                   Delete

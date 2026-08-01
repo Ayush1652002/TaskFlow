@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
+import axios from "../api/axios";
+import useAxiosPrivate from '../hooks/useAxiosPrivate';
 
-const Layout = () => {
+const Layout = ({ auth, setAuth }) => {
+  useAxiosPrivate(auth, setAuth);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -68,6 +71,20 @@ const Layout = () => {
             ⚙️ Settings
           </NavLink>
         </nav>
+
+        {/* Logout */}
+        <div className="mt-auto">
+          <p className="text-xs text-gray-600 px-2 mb-2">Logged in as {auth?.name}</p>
+          <button
+            onClick={async () => {
+              await axios.post("/auth/logout");
+              setAuth(null);
+            }}
+            className="w-full text-sm px-3 py-2 rounded-lg text-red-400 hover:bg-[#1e1e1e] transition text-left"
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
       {/* Main */}

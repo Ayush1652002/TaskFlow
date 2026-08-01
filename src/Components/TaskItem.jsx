@@ -2,17 +2,20 @@ import { useContext, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TaskContext } from "../Context/TaskContext";
+import { formatDueDate } from '../utils/dateHelpers';
+import TaskDetailPanel from "./TaskDetailPanel";
 
 const TaskItem = ({ task }) => {
   const { toggleTask, deleteTask, updateTask } = useContext(TaskContext);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(task.title);
+  const [showDetail, setShowDetail] = useState(false);
 
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   const saveEdit = () => {
-    updateTask(task.id, editValue);
+    updateTask(task._id, editValue);
     setIsEditing(false);
   };
 
@@ -43,7 +46,7 @@ const TaskItem = ({ task }) => {
 
       {/* Checkbox */}
       <button
-        onClick={() => toggleTask(task.id)}
+        onClick={() => toggleTask(task._id)}
         className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition ${task.completed
             ? "bg-violet-600 border-violet-600"
             : "border-gray-600 hover:border-violet-500"
@@ -51,7 +54,7 @@ const TaskItem = ({ task }) => {
       />
 
       {/* Title */}
-      <div className="flex-1">
+      <div className="flex-1 cursor-pointer" onClick={() => setShowDetail(true)}>
         {isEditing ? (
           <input
             value={editValue}
@@ -86,11 +89,15 @@ const TaskItem = ({ task }) => {
         )}
 
         {task.dueDate && (
-          <span className={`text-xs px-2 py-0.5 rounded-md ${isOverdue ? "text-red-400 bg-red-400/10" : "text-gray-400 bg-white/5"
-            }`}>
-            📅 {task.dueDate}
-          </span>
-        )}
+  <span className={`text-xs px-2 py-0.5 rounded-md ${
+    formatDueDate(task.dueDate) === 'Overdue' ? 'text-red-400 bg-red-400/10' :
+    formatDueDate(task.dueDate) === 'Today' ? 'text-yellow-400 bg-yellow-400/10' :
+    formatDueDate(task.dueDate) === 'Tomorrow' ? 'text-blue-400 bg-blue-400/10' :
+    'text-gray-400 bg-white/5'
+  }`}>
+    📅 {formatDueDate(task.dueDate)}
+  </span>
+)}
       </div>
 
       {/* Actions */}
@@ -102,13 +109,13 @@ const TaskItem = ({ task }) => {
           Edit
         </button>
         <button
-          onClick={() => deleteTask(task.id)}
+          onClick={() => deleteTask(task._id)}
           className="text-xs px-2 py-1 rounded-lg bg-[#1e1e1e] text-red-400 hover:text-red-300 transition"
         >
           Delete
         </button>
       </div>
-
+    {showDetail && <TaskDetailPanel task={task} onClose={() => setShowDetail(false)} />}
     </div>
   );
 };
