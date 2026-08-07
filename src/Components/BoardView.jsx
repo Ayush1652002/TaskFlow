@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import { TaskContext } from "../Context/TaskContext";
+import { formatDueDate } from "../utils/dateHelpers";
 
 const columns = [
   { id: "todo", label: "Todo" },
@@ -72,7 +73,7 @@ const BoardView = () => {
                       ? "text-red-400 bg-red-400/10"
                       : "text-gray-400 bg-white/5"
                   }`}>
-                    📅 {task.dueDate}
+                    📅 {formatDueDate(task.dueDate)}
                   </span>
                 )}
               </div>

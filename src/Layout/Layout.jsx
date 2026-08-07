@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import axios from "../api/axios";
 import useAxiosPrivate from '../hooks/useAxiosPrivate';
+import WorkspaceSwitcher from '../Components/WorkspaceSwitcher';
+import NotificationBell from '../Components/NotificationBell';
 
 const Layout = ({ auth, setAuth }) => {
   useAxiosPrivate(auth, setAuth);
@@ -37,6 +39,8 @@ const Layout = ({ auth, setAuth }) => {
           </button>
         </div>
 
+        <WorkspaceSwitcher />
+
         {/* Nav */}
         <nav className="flex flex-col gap-1">
           <p className="text-xs text-gray-500 uppercase tracking-widest px-2 mb-1">Menu</p>
@@ -61,6 +65,16 @@ const Layout = ({ auth, setAuth }) => {
             📊 Analytics
           </NavLink>
 
+          <NavLink to="/activity" onClick={() => setMenuOpen(false)} className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+              isActive
+                ? "bg-violet-600 text-white"
+                : "text-gray-400 hover:bg-[#1e1e1e] hover:text-white"
+            }`
+          }>
+            🕘 Activity
+          </NavLink>
+
           <NavLink to="/settings" onClick={() => setMenuOpen(false)} className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
               isActive
@@ -69,6 +83,16 @@ const Layout = ({ auth, setAuth }) => {
             }`
           }>
             ⚙️ Settings
+          </NavLink>
+
+          <NavLink to="/trash" onClick={() => setMenuOpen(false)} className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+              isActive
+                ? "bg-violet-600 text-white"
+                : "text-gray-400 hover:bg-[#1e1e1e] hover:text-white"
+            }`
+          }>
+            🗑️ Trash
           </NavLink>
         </nav>
 
@@ -96,15 +120,21 @@ const Layout = ({ auth, setAuth }) => {
             <div className="w-5 h-5 bg-violet-600 rounded-md"></div>
             <span className="text-sm font-semibold">TaskFlow</span>
           </div>
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="text-gray-400 hover:text-white text-xl"
-          >
-            ☰
-          </button>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="text-gray-400 hover:text-white text-xl"
+            >
+              ☰
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+          <div className="hidden md:flex justify-end mb-4">
+            <NotificationBell />
+          </div>
           <Outlet />
         </main>
 

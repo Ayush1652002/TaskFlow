@@ -3,7 +3,7 @@ import axios from "../api/axios";
 import toast from 'react-hot-toast';
 export const TaskContext = createContext();
 
-const TaskProvider = ({ children, auth }) => {
+const TaskProvider = ({ children, auth, activeWorkspace }) => {
 const [tasks, setTasks] = useState([]);
 const [totalPages, setTotalPages] = useState(1);
 const [currentPage, setCurrentPage] = useState(1);
@@ -12,20 +12,25 @@ const [loading, setLoading] = useState(false);
   const config = {
     headers: { Authorization: `Bearer ${auth?.accessToken}` }
   };
+  const wsId = activeWorkspace?._id;
+  const base = `/tasks/${wsId}`;
 
   // Load tasks
-const fetchTasks = async (page = 1, search = '', filter = 'all', priority = '') => {
+const fetchTasks = async (page = 1, search = '', filter = 'all', priority = '', sortBy = 'order', order = 'asc') => {
+  if (!wsId) return;
   try {
     setLoading(true);
     const params = new URLSearchParams({
       page,
       limit: 10,
+      sortBy,
+      order,
       ...(search && { search }),
       ...(filter !== 'all' && { status: filter }),
       ...(priority && { priority }),
     });
 
-    const res = await axios.get(`/tasks?${params}`, config);
+    const res = await axios.get(`${base}?${params}`, config);
     setTasks(res.data.tasks || res.data || []);
     setTotalPages(res.data.totalPages || 1);
     setCurrentPage(res.data.page || 1);
@@ -38,13 +43,17 @@ const fetchTasks = async (page = 1, search = '', filter = 'all', priority = '') 
 
 // Now the useEffect just calls it
 useEffect(() => {
-  if (auth?.accessToken) fetchTasks();
-}, [auth]);
+  if (auth?.accessToken && wsId) fetchTasks();
+}, [auth, wsId]);
 
-  const addTask = async ({ title, priority, dueDate, description, category }) => {
+  const addTask = async ({ title, priority, dueDate, description, category, recurrence, assignee }) => {
+    if (!wsId) {
+      toast.error('Create or select a workspace first');
+      return;
+    }
     try {
-      const res = await axios.post("/tasks", {
-        title, priority, dueDate, description, category
+      const res = await axios.post(base, {
+        title, priority, dueDate, description, category, recurrence, assignee
       }, config);
       setTasks(prev => [...prev, res.data]);
       toast.success('Task added');
@@ -56,11 +65,18 @@ useEffect(() => {
 const toggleTask = async (id) => {
   // optimistically update UI first
   const previousTasks = tasks;
-  setTasks(prev => prev.map(t => t._id === id ? { ...t, completed: !t.completed } : t));
+  const task = tasks.find(t => t._id === id);
+  const willBeCompleted = !task.completed;
+  setTasks(prev => prev.map(t => t._id === id ? { ...t, completed: willBeCompleted } : t));
 
   try {
-    const task = tasks.find(t => t._id === id);
-    await axios.put(`/tasks/${id}`, { completed: !task.completed }, config);
+    await axios.put(`${base}/${id}`, { completed: willBeCompleted }, config);
+
+    // Completing a recurring task silently creates its next occurrence on
+    // the backend — refetch so that new task actually shows up here too.
+    if (willBeCompleted && task.recurrence && task.recurrence !== 'none') {
+      fetchTasks(currentPage);
+    }
   } catch (err) {
     setTasks(previousTasks); // rollback on failure
     toast.error('Failed to update task');
@@ -72,8 +88,8 @@ const deleteTask = async (id) => {
   setTasks(prev => prev.filter(t => t._id !== id));
 
   try {
-    await axios.delete(`/tasks/${id}`, config);
-    toast.success('Task deleted');
+    await axios.delete(`${base}/${id}`, config);
+    toast.success('Task moved to trash');
   } catch (err) {
     setTasks(previousTasks); // rollback on failure
     toast.error('Failed to delete task');
@@ -82,19 +98,40 @@ const deleteTask = async (id) => {
 
   const updateTask = async (id, newTitle) => {
     try {
-      const res = await axios.put(`/tasks/${id}`, { title: newTitle }, config);
+      const res = await axios.put(`${base}/${id}`, { title: newTitle }, config);
       setTasks(prev => prev.map(t => t._id === id ? res.data : t));
     } catch (err) {
       toast.error('Failed to update task');
     }
   };
 
-  const reorderTasks = (newTasks) => {
-    setTasks(newTasks);
+  // Generic version — used by TaskDetailPanel to save title, description,
+  // priority, category, status, and dueDate together in one request.
+  const editTask = async (id, fields) => {
+    try {
+      const res = await axios.put(`${base}/${id}`, fields, config);
+      setTasks(prev => prev.map(t => t._id === id ? res.data : t));
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update task');
+      throw err;
+    }
+  };
+
+  const reorderTasks = async (newTasks) => {
+    const previousTasks = tasks;
+    setTasks(newTasks); // optimistic update, drag feels instant
+
+    try {
+      await axios.patch(`${base}/reorder`, { orderedIds: newTasks.map(t => t._id) }, config);
+    } catch (err) {
+      setTasks(previousTasks); // rollback if the server rejects it
+      toast.error('Failed to save new order');
+    }
   };
 const updateTaskStatus = async (id, status) => {
   try {
-    const res = await axios.put(`/tasks/${id}`, { status }, config);
+    const res = await axios.put(`${base}/${id}`, { status }, config);
     setTasks(prev => prev.map(t => t._id === id ? res.data : t));
     toast.success('Task updated'); 
   } catch (err) {
@@ -104,7 +141,7 @@ const updateTaskStatus = async (id, status) => {
 
   const clearAllTasks = async () => {
   try {
-    await axios.delete('/tasks', config);
+    await axios.delete(base, config);
     setTasks([]);
     toast.success('All tasks cleared');
   } catch (err) {
@@ -121,6 +158,7 @@ const updateTaskStatus = async (id, status) => {
       toggleTask,
       deleteTask,
       updateTask,
+      editTask,
       reorderTasks,
       updateTaskStatus,
       clearAllTasks,

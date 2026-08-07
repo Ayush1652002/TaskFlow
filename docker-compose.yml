@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: taskflow-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build:
+      context: ./taskflow-backend
+      dockerfile: Dockerfile
+    container_name: taskflow-backend-app
+    restart: unless-stopped
+    ports:
+      - "3500:3500"
+    volumes:
+      - backend-uploads:/app/uploads
+    environment:
+      # Talks to the mongo *service name*, not localhost — Compose gives each
+      # service its own DNS entry on the shared network.
+      MONGO_URI: mongodb://mongo:27017/sprintflow
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: http://localhost:3500/auth/google/callback
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      PORT: 3500
+      FRONTEND_URL: http://localhost:5173
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow-frontend-app
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
+  backend-uploads:

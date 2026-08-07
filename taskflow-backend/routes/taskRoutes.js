@@ -3,34 +3,57 @@ const router = express.Router();
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
 const verifyJWT = require('../middleware/verifyJWT');
-const { getAllTasks, createTask, updateTask, deleteTask } = require('../controllers/taskControllers');
+const { requireWorkspaceRole } = require('../middleware/workspaceAuth');
+const { getAllTasks, createTask, updateTask, deleteTask, reorderTasks, getTrash, restoreTask, purgeTask } = require('../controllers/taskControllers');
+const { getComments, addComment } = require('../controllers/commentControllers');
+const { getTaskHistory } = require('../controllers/activityControllers');
+const { uploadAttachment, deleteAttachment } = require('../controllers/attachmentControllers');
+const upload = require('../middleware/upload');
 const Task = require('../models/Task');
+const asyncHandler = require('../utils/asyncHandler');
 
-router.use(verifyJWT);
+// All task routes are nested under a workspace: /tasks/:workspaceId/...
+router.use('/:workspaceId', verifyJWT, requireWorkspaceRole('member'));
 
-router.get('/', getAllTasks);
+router.get('/:workspaceId', getAllTasks);
 
-router.post('/', [
+router.post('/:workspaceId', [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('priority').optional().isIn(['Low', 'Medium', 'High']).withMessage('Invalid priority'),
   body('status').optional().isIn(['todo', 'inprogress', 'done']).withMessage('Invalid status'),
+  body('assignee').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid assignee'),
+  body('recurrence').optional().isIn(['none', 'daily', 'weekly', 'monthly']).withMessage('Invalid recurrence'),
 ], validate, createTask);
 
-router.put('/:id', [
+router.patch('/:workspaceId/reorder', reorderTasks);
+
+router.put('/:workspaceId/:id', [
   body('title').optional().trim().notEmpty().withMessage('Title cannot be empty'),
   body('priority').optional().isIn(['Low', 'Medium', 'High']).withMessage('Invalid priority'),
   body('status').optional().isIn(['todo', 'inprogress', 'done']).withMessage('Invalid status'),
+  body('assignee').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid assignee'),
+  body('recurrence').optional().isIn(['none', 'daily', 'weekly', 'monthly']).withMessage('Invalid recurrence'),
 ], validate, updateTask);
 
-router.delete('/', async (req, res) => {
-  try {
-    await Task.deleteMany({ user: req.user.id });
-    res.json({ message: 'All tasks deleted' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+router.delete('/:workspaceId', asyncHandler(async (req, res) => {
+  await Task.updateMany({ workspace: req.workspace._id, deletedAt: null }, { deletedAt: new Date() });
+  res.json({ message: 'All tasks moved to trash' });
+}));
 
-router.delete('/:id', deleteTask);
+router.get('/:workspaceId/trash', getTrash);
+router.patch('/:workspaceId/:id/restore', restoreTask);
+router.delete('/:workspaceId/:id/purge', purgeTask);
+
+router.delete('/:workspaceId/:id', deleteTask);
+
+router.get('/:workspaceId/:taskId/comments', getComments);
+router.post('/:workspaceId/:taskId/comments', [
+  body('text').trim().notEmpty().withMessage('Comment text is required'),
+], validate, addComment);
+
+router.get('/:workspaceId/:taskId/history', getTaskHistory);
+
+router.post('/:workspaceId/:taskId/attachments', upload.single('file'), uploadAttachment);
+router.delete('/:workspaceId/:taskId/attachments/:attachmentId', deleteAttachment);
 
 module.exports = router;

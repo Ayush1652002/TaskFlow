@@ -1,8 +1,8 @@
 import { useContext, useState } from "react";
 import { TaskContext } from "../Context/TaskContext";
 import TaskItem from "../Components/TaskItem";
-import { DndContext, closestCenter } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import BoardView from "../Components/BoardView";
 import TaskSkeleton from '../Components/TaskSkeleton';
 
@@ -16,15 +16,27 @@ const Dashboard = ({ auth }) => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("General");
   const [view, setView] = useState("list");
+  const [sortBy, setSortBy] = useState("order");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [recurrence, setRecurrence] = useState("none");
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
-    addTask({ title: newTask, priority, dueDate: newDueDate, description, category });
+    addTask({ title: newTask, priority, dueDate: newDueDate, description, category, recurrence });
     setNewTask("");
     setNewDueDate("");
     setPriority("Medium");
     setDescription("");
     setCategory("General");
+    setRecurrence("none");
+  };
+
+  const handleSortChange = (field) => {
+    // Clicking the same field again flips direction; picking a new field defaults to ascending
+    const nextOrder = field === sortBy && sortOrder === "asc" ? "desc" : "asc";
+    setSortBy(field);
+    setSortOrder(nextOrder);
+    fetchTasks(1, search, filter, "", field, nextOrder);
   };
 
   const filteredTasks = (tasks || []).filter(task => {
@@ -46,6 +58,13 @@ const Dashboard = ({ auth }) => {
     reordered.splice(newIndex, 0, reordered.splice(oldIndex, 1)[0]);
     reorderTasks(reordered);
   };
+
+  // PointerSensor handles mouse/touch; KeyboardSensor makes the same reorder
+  // possible via Tab -> Space (pick up) -> Arrow keys (move) -> Space (drop).
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   return (
     <div className="space-y-8">
@@ -102,6 +121,17 @@ const Dashboard = ({ auth }) => {
             onChange={(e) => setNewDueDate(e.target.value)}
             className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
           />
+          <select
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value)}
+            aria-label="Repeat"
+            className="bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-2 outline-none"
+          >
+            <option value="none">No repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button
             onClick={handleAdd}
             className="ml-auto bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 py-2 rounded-lg transition"
@@ -160,6 +190,25 @@ const Dashboard = ({ auth }) => {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-auto md:ml-auto bg-[#1e1e1e] text-sm text-gray-300 border border-[#2e2e2e] rounded-lg px-3 py-1.5 outline-none placeholder-gray-600"
           />
+
+          <div className="flex gap-1" role="group" aria-label="Sort tasks">
+            {[
+              { field: "dueDate", label: "Due Date" },
+              { field: "priority", label: "Priority" },
+              { field: "title", label: "Title" },
+            ].map(({ field, label }) => (
+              <button
+                key={field}
+                onClick={() => handleSortChange(field)}
+                aria-pressed={sortBy === field}
+                className={`text-xs px-3 py-1.5 rounded-lg transition ${
+                  sortBy === field ? "bg-violet-600 text-white" : "bg-[#1e1e1e] text-gray-400 hover:text-white"
+                }`}
+              >
+                {label} {sortBy === field && (sortOrder === "asc" ? "↑" : "↓")}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -168,7 +217,7 @@ const Dashboard = ({ auth }) => {
         loading ? (
           <TaskSkeleton />
         ) : (
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={filteredTasks.map(t => t._id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
                 {filteredTasks.length === 0 && (

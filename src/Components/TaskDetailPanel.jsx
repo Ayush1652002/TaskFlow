@@ -1,14 +1,32 @@
 import { useState, useContext } from "react";
 import { TaskContext } from "../Context/TaskContext";
+import { WorkspaceContext } from "../Context/WorkspaceContext";
+import TaskComments from "./TaskComments";
+import TaskHistory from "./TaskHistory";
+import TaskAttachments from "./TaskAttachments";
 
 const TaskDetailPanel = ({ task, onClose }) => {
-  const { updateTask, toggleTask, deleteTask } = useContext(TaskContext);
+  const { editTask, toggleTask, deleteTask } = useContext(TaskContext);
+  const { activeWorkspace } = useContext(WorkspaceContext);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
+  const [priority, setPriority] = useState(task.priority);
+  const [category, setCategory] = useState(task.category);
+  const [status, setStatus] = useState(task.status);
+  const [assignee, setAssignee] = useState(task.assignee?._id || task.assignee || "");
+  const [recurrence, setRecurrence] = useState(task.recurrence || "none");
+  // dueDate from the API is an ISO string; <input type="date"> needs yyyy-mm-dd
+  const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.slice(0, 10) : "");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    updateTask(task._id, title);
-    onClose();
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await editTask(task._id, { title, description, priority, category, status, dueDate, assignee: assignee || null, recurrence });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -18,7 +36,7 @@ const TaskDetailPanel = ({ task, onClose }) => {
 
       {/* Panel */}
       <div className="w-full max-w-md bg-[#141414] border-l border-[#1e1e1e] h-full p-6 space-y-6 overflow-y-auto">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-gray-400">Task Detail</h2>
@@ -46,23 +64,84 @@ const TaskDetailPanel = ({ task, onClose }) => {
           />
         </div>
 
-        {/* Meta */}
+        {/* Meta — now real inputs, not read-only text */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Priority</label>
-            <p className="text-sm text-white">{task.priority}</p>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Category</label>
-            <p className="text-sm text-white">{task.category}</p>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            >
+              <option value="General">General</option>
+              <option value="Work">Work</option>
+              <option value="Personal">Personal</option>
+              <option value="College">College</option>
+              <option value="Health">Health</option>
+            </select>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Status</label>
-            <p className="text-sm text-white capitalize">{task.status}</p>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition capitalize"
+            >
+              <option value="todo">Todo</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Due Date</label>
-            <p className="text-sm text-white">{task.dueDate || "No due date"}</p>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500">Assignee</label>
+            <select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            >
+              <option value="">Unassigned</option>
+              {activeWorkspace?.members?.map((m) => {
+                const memberId = m.user._id || m.user;
+                const memberName = m.user.name || "Unknown";
+                return (
+                  <option key={memberId} value={memberId}>{memberName}</option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500">Repeat</label>
+            <select
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value)}
+              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            >
+              <option value="none">Doesn't repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </div>
         </div>
 
@@ -76,9 +155,10 @@ const TaskDetailPanel = ({ task, onClose }) => {
         <div className="flex gap-2 pt-2">
           <button
             onClick={handleSave}
-            className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm py-2 rounded-lg transition"
+            disabled={saving}
+            className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
           <button
             onClick={() => { toggleTask(task._id); onClose(); }}
@@ -93,6 +173,15 @@ const TaskDetailPanel = ({ task, onClose }) => {
             Delete
           </button>
         </div>
+
+        <hr className="border-[#1e1e1e]" />
+        <TaskAttachments task={task} />
+
+        <hr className="border-[#1e1e1e]" />
+        <TaskComments taskId={task._id} />
+
+        <hr className="border-[#1e1e1e]" />
+        <TaskHistory taskId={task._id} />
 
       </div>
     </div>

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend — install & syntax check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: taskflow-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: taskflow-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No test suite exists yet — this at least catches syntax errors across
+      # every JS file so a broken commit can't merge silently.
+      - name: Syntax check all source files
+        run: find . -name "*.js" -not -path "./node_modules/*" -exec node --check {} \;
+
+      - name: Run tests
+        run: npm test
+
+  frontend:
+    name: Frontend — install, lint, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: TaskFlow
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: TaskFlow/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

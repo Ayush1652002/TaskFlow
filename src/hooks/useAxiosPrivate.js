@@ -24,7 +24,7 @@ const useAxiosPrivate = (auth, setAuth) => {
           prevRequest.sent = true;
           try {
             const res = await api.get('/auth/refresh');
-            setAuth({ accessToken: res.data.accessToken, name: res.data.name });
+            setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
             prevRequest.headers['Authorization'] = `Bearer ${res.data.accessToken}`;
             return api(prevRequest);
           } catch (err) {
