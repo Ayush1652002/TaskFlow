@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 
 const TYPE_ICON = {
   task_created: "✨",
@@ -19,6 +19,7 @@ const ActivityTimeline = () => {
 
   useEffect(() => {
     if (!activeWorkspace) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: kicks off the data fetch for this page/workspace
     setLoading(true);
     const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
     axios
@@ -28,7 +29,7 @@ const ActivityTimeline = () => {
         setTotalPages(res.data.totalPages);
       })
       .finally(() => setLoading(false));
-  }, [activeWorkspace, page]);
+  }, [activeWorkspace, page, auth?.accessToken]);
 
   if (!activeWorkspace) {
     return <p className="text-gray-500 text-sm">Select a workspace to view its activity.</p>;

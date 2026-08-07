@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 
 const TaskHistory = ({ taskId }) => {
   const { activeWorkspace, auth } = useContext(WorkspaceContext);
@@ -8,12 +8,13 @@ const TaskHistory = ({ taskId }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!activeWorkspace?._id) return;
     const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
     axios
       .get(`/tasks/${activeWorkspace._id}/${taskId}/history`, config)
       .then((res) => setHistory(res.data))
       .finally(() => setLoading(false));
-  }, [taskId]);
+  }, [taskId, activeWorkspace?._id, auth?.accessToken]);
 
   return (
     <div className="space-y-2">

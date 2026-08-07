@@ -27,7 +27,7 @@ const useAxiosPrivate = (auth, setAuth) => {
             setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
             prevRequest.headers['Authorization'] = `Bearer ${res.data.accessToken}`;
             return api(prevRequest);
-          } catch (err) {
+          } catch {
             setAuth(null);
           }
         }
@@ -39,7 +39,7 @@ const useAxiosPrivate = (auth, setAuth) => {
       api.interceptors.request.eject(requestInterceptor);
       api.interceptors.response.eject(responseInterceptor);
     };
-  }, [auth]);
+  }, [auth, setAuth]);
 };
 
 export default useAxiosPrivate;

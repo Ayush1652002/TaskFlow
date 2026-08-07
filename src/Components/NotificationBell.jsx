@@ -1,6 +1,6 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 
 const TYPE_ICON = { assigned: "📌", mentioned: "💬" };
 
@@ -10,7 +10,10 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
 
-  const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
 
   const fetchNotifications = useCallback(async () => {
     if (!auth?.accessToken) return;
@@ -21,11 +24,12 @@ const NotificationBell = () => {
     } catch {
       // notifications are non-critical — fail silently rather than toast-spam the whole app
     }
-  }, [auth]);
+  }, [auth?.accessToken, config]);
 
   // Polling instead of websockets — simple, no extra infra, "good enough"
   // freshness for a task tool (60s), and stops the moment the tab isn't focused.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: kicks off polling-based data fetch on mount/interval, not derived state
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);

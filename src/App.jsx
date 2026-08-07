@@ -9,7 +9,8 @@ import Trash from "./Pages/Trash.jsx";
 import Login from "./Pages/Login.jsx";
 import axios from "./api/axios";
 import TaskProvider from "./Context/TaskContext";
-import WorkspaceProvider, { WorkspaceContext } from "./Context/WorkspaceContext";
+import WorkspaceProvider from "./Context/WorkspaceContext";
+import { WorkspaceContext } from "./Context/workspaceContextObject";
 import { useContext } from "react";
 import NotFound from "./Pages/NotFound";
 import { Toaster } from "react-hot-toast";
@@ -23,7 +24,7 @@ const App = () => {
       try {
         const res = await axios.get("/auth/refresh");
         setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
-      } catch (err) {
+      } catch {
         setAuth(null);
       } finally {
         setLoading(false);

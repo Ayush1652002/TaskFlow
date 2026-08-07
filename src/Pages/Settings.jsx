@@ -1,6 +1,6 @@
-import { useState, useEffect, useContext } from "react";
-import { TaskContext } from "../Context/TaskContext";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { useState, useEffect, useContext, useMemo } from "react";
+import { TaskContext } from "../Context/taskContextObject";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import MembersPanel from "../Components/MembersPanel";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
@@ -14,12 +14,15 @@ const Settings = () => {
   const [upgradeEmail, setUpgradeEmail] = useState("");
   const [upgradePassword, setUpgradePassword] = useState("");
   const [upgrading, setUpgrading] = useState(false);
-  const { tasks, clearAllTasks } = useContext(TaskContext);
+  const { clearAllTasks } = useContext(TaskContext);
   const { auth, activeWorkspace, myRole, deleteWorkspace } = useContext(WorkspaceContext);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [confirmingDeleteWorkspace, setConfirmingDeleteWorkspace] = useState(false);
 
-  const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
 
   // Load the real profile from the backend instead of localStorage
   useEffect(() => {
@@ -31,7 +34,7 @@ const Settings = () => {
       })
       .catch(() => toast.error("Failed to load profile"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [config]);
 
   const handleUpgrade = async () => {
     if (!upgradeEmail.trim() || upgradePassword.length < 6) {

@@ -1,19 +1,19 @@
-import { createContext, useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
-
-export const WorkspaceContext = createContext();
+import { WorkspaceContext } from "./workspaceContextObject";
 
 const WorkspaceProvider = ({ children, auth }) => {
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const config = {
-    headers: { Authorization: `Bearer ${auth?.accessToken}` },
-  };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
 
-  const fetchWorkspaces = async () => {
+  const fetchWorkspaces = useCallback(async () => {
     try {
       setLoading(true);
       const res = await axios.get("/workspaces", config);
@@ -23,16 +23,16 @@ const WorkspaceProvider = ({ children, auth }) => {
       const savedId = localStorage.getItem("activeWorkspaceId");
       const restored = res.data.find(w => w._id === savedId);
       setActiveWorkspace(restored || res.data[0] || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load workspaces");
     } finally {
       setLoading(false);
     }
-  };
+  }, [config]);
 
   useEffect(() => {
     if (auth?.accessToken) fetchWorkspaces();
-  }, [auth]);
+  }, [auth?.accessToken, fetchWorkspaces]);
 
   const createWorkspace = async (name) => {
     try {

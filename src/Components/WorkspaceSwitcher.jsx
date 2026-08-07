@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 
 const WorkspaceSwitcher = () => {
   const { workspaces, activeWorkspace, switchWorkspace, createWorkspace, myRole } = useContext(WorkspaceContext);

@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
 

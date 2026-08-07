@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { TaskContext } from "../Context/TaskContext";
+import { TaskContext } from "../Context/taskContextObject";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const Analytics = () => {

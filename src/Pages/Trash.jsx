@@ -1,6 +1,6 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import toast from "react-hot-toast";
 
 const Trash = () => {
@@ -9,9 +9,12 @@ const Trash = () => {
   const [trashedWorkspaces, setTrashedWorkspaces] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
 
-  const fetchTrash = async () => {
+  const fetchTrash = useCallback(async () => {
     setLoading(true);
     try {
       const [taskRes, wsRes] = await Promise.all([
@@ -25,9 +28,9 @@ const Trash = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeWorkspace, config]);
 
-  useEffect(() => { fetchTrash(); }, [activeWorkspace]);
+  useEffect(() => { fetchTrash(); }, [fetchTrash]);
 
   const daysLeft = (deletedAt) => {
     const elapsed = Date.now() - new Date(deletedAt).getTime();

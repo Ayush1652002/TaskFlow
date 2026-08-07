@@ -1,6 +1,6 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import toast from "react-hot-toast";
 
 const TaskComments = ({ taskId }) => {
@@ -9,10 +9,13 @@ const TaskComments = ({ taskId }) => {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const config = { headers: { Authorization: `Bearer ${auth?.accessToken}` } };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
   const base = `/tasks/${activeWorkspace?._id}/${taskId}/comments`;
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const res = await axios.get(base, config);
       setComments(res.data);
@@ -21,9 +24,9 @@ const TaskComments = ({ taskId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [base, config]);
 
-  useEffect(() => { fetchComments(); }, [taskId]);
+  useEffect(() => { fetchComments(); }, [fetchComments]);
 
   const handlePost = async () => {
     if (!text.trim()) return;

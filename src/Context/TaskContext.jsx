@@ -1,7 +1,7 @@
-import { createContext, useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "../api/axios";
 import toast from 'react-hot-toast';
-export const TaskContext = createContext();
+import { TaskContext } from "./taskContextObject";
 
 const TaskProvider = ({ children, auth, activeWorkspace }) => {
 const [tasks, setTasks] = useState([]);
@@ -9,14 +9,15 @@ const [totalPages, setTotalPages] = useState(1);
 const [currentPage, setCurrentPage] = useState(1);
 const [loading, setLoading] = useState(false);
 
-  const config = {
-    headers: { Authorization: `Bearer ${auth?.accessToken}` }
-  };
+  const config = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${auth?.accessToken}` } }),
+    [auth?.accessToken]
+  );
   const wsId = activeWorkspace?._id;
   const base = `/tasks/${wsId}`;
 
   // Load tasks
-const fetchTasks = async (page = 1, search = '', filter = 'all', priority = '', sortBy = 'order', order = 'asc') => {
+const fetchTasks = useCallback(async (page = 1, search = '', filter = 'all', priority = '', sortBy = 'order', order = 'asc') => {
   if (!wsId) return;
   try {
     setLoading(true);
@@ -34,17 +35,17 @@ const fetchTasks = async (page = 1, search = '', filter = 'all', priority = '', 
     setTasks(res.data.tasks || res.data || []);
     setTotalPages(res.data.totalPages || 1);
     setCurrentPage(res.data.page || 1);
-  } catch (err) {
+  } catch {
     toast.error('Failed to load tasks');
   } finally {
     setLoading(false);
   }
-};
+}, [wsId, base, config]);
 
 // Now the useEffect just calls it
 useEffect(() => {
   if (auth?.accessToken && wsId) fetchTasks();
-}, [auth, wsId]);
+}, [auth?.accessToken, wsId, fetchTasks]);
 
   const addTask = async ({ title, priority, dueDate, description, category, recurrence, assignee }) => {
     if (!wsId) {
@@ -57,7 +58,7 @@ useEffect(() => {
       }, config);
       setTasks(prev => [...prev, res.data]);
       toast.success('Task added');
-    } catch (err) {
+    } catch {
       toast.error('Failed to add task');
     }
   };
@@ -77,7 +78,7 @@ const toggleTask = async (id) => {
     if (willBeCompleted && task.recurrence && task.recurrence !== 'none') {
       fetchTasks(currentPage);
     }
-  } catch (err) {
+  } catch {
     setTasks(previousTasks); // rollback on failure
     toast.error('Failed to update task');
   }
@@ -90,7 +91,7 @@ const deleteTask = async (id) => {
   try {
     await axios.delete(`${base}/${id}`, config);
     toast.success('Task moved to trash');
-  } catch (err) {
+  } catch {
     setTasks(previousTasks); // rollback on failure
     toast.error('Failed to delete task');
   }
@@ -100,7 +101,7 @@ const deleteTask = async (id) => {
     try {
       const res = await axios.put(`${base}/${id}`, { title: newTitle }, config);
       setTasks(prev => prev.map(t => t._id === id ? res.data : t));
-    } catch (err) {
+    } catch {
       toast.error('Failed to update task');
     }
   };
@@ -124,7 +125,7 @@ const deleteTask = async (id) => {
 
     try {
       await axios.patch(`${base}/reorder`, { orderedIds: newTasks.map(t => t._id) }, config);
-    } catch (err) {
+    } catch {
       setTasks(previousTasks); // rollback if the server rejects it
       toast.error('Failed to save new order');
     }
@@ -134,7 +135,7 @@ const updateTaskStatus = async (id, status) => {
     const res = await axios.put(`${base}/${id}`, { status }, config);
     setTasks(prev => prev.map(t => t._id === id ? res.data : t));
     toast.success('Task updated'); 
-  } catch (err) {
+  } catch {
     toast.error('Failed to update task'); 
   }
 };

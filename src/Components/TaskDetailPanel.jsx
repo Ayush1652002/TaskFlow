@@ -1,6 +1,6 @@
 import { useState, useContext } from "react";
-import { TaskContext } from "../Context/TaskContext";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { TaskContext } from "../Context/taskContextObject";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import TaskComments from "./TaskComments";
 import TaskHistory from "./TaskHistory";
 import TaskAttachments from "./TaskAttachments";

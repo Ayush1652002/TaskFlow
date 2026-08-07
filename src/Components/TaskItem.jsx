@@ -1,7 +1,7 @@
 import { useContext, useState, memo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TaskContext } from "../Context/TaskContext";
+import { TaskContext } from "../Context/taskContextObject";
 import { formatDueDate } from '../utils/dateHelpers';
 import TaskDetailPanel from "./TaskDetailPanel";
 
@@ -24,10 +24,6 @@ const TaskItemComponent = ({ task }) => {
     Medium: "text-yellow-400 bg-yellow-400/10",
     Low: "text-green-400 bg-green-400/10",
   };
-
-  const isOverdue = task.dueDate &&
-    new Date(task.dueDate) < new Date(new Date().toDateString()) &&
-    !task.completed;
 
   return (
     <div

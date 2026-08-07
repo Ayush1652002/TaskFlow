@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useRef } from "react";
 import axios from "../api/axios";
-import { WorkspaceContext } from "../Context/WorkspaceContext";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import toast from "react-hot-toast";
 
 const formatSize = (bytes) => {
@@ -54,7 +54,7 @@ const TaskAttachments = ({ task, onUpdated }) => {
       const updated = attachments.filter(a => a._id !== attachmentId);
       setAttachments(updated);
       onUpdated?.(updated);
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete attachment");
     }
   };
