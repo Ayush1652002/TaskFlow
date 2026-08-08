@@ -58,7 +58,7 @@ const Login = ({ setAuth }) => {
     try {
       const res = await axios.post("/auth/guest");
       setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
-    } catch (err) {
+    } catch {
       setError("Failed to start guest session");
     }
   };
