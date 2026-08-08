@@ -194,13 +194,14 @@ const googleCallback = asyncHandler(async (req, res) => {
     await applyPendingInvites(user);
   }
 
-  await issueSession(res, user);
+  const accessToken = await issueSession(res, user);
 
-  // This is a full-page browser redirect (not an XHR/fetch call), so we
-  // can't just return JSON here — the cookies are already set above, so
-  // the frontend just needs to land on a page that calls /auth/refresh
-  // to pick up an access token from those cookies.
-  res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173');
+  // Cross-domain setup (Vercel frontend + Render backend) means the refresh
+  // cookie won't be sent back by the browser due to third-party cookie blocking.
+  // Solution: pass the accessToken in the redirect URL so the frontend can
+  // pick it up directly without needing to call /auth/refresh.
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${frontendUrl}?token=${accessToken}&name=${encodeURIComponent(user.name)}&id=${user._id}`);
 });
 
 // POST /auth/guest — no email/password needed, creates a throwaway account

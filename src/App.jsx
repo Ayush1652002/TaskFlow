@@ -9,8 +9,7 @@ import Trash from "./Pages/Trash.jsx";
 import Login from "./Pages/Login.jsx";
 import axios from "./api/axios";
 import TaskProvider from "./Context/TaskContext";
-import WorkspaceProvider from "./Context/WorkspaceContext";
-import { WorkspaceContext } from "./Context/workspaceContextObject";
+import WorkspaceProvider, { WorkspaceContext } from "./Context/WorkspaceContext";
 import { useContext } from "react";
 import NotFound from "./Pages/NotFound";
 import { Toaster } from "react-hot-toast";
@@ -20,6 +19,21 @@ const App = () => {
   const [loading, setLoading] = useState(true); 
 
   useEffect(() => {
+    // Google OAuth redirect lands here with ?token=...&name=...&id=...
+    // Pick it up directly instead of calling /auth/refresh (cross-domain cookies get blocked)
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const name = params.get('name');
+    const id = params.get('id');
+
+    if (token && name && id) {
+      setAuth({ accessToken: token, name, id });
+      // Clean the URL so token doesn't stay in browser history
+      window.history.replaceState({}, '', window.location.pathname);
+      setLoading(false);
+      return;
+    }
+
     const refresh = async () => {
       try {
         const res = await axios.get("/auth/refresh");
