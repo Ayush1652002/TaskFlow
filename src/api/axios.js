@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+// In production (Vercel), VITE_API_URL points to the deployed Render backend.
+// Locally, no env var is set, so it falls back to localhost.
 const api = axios.create({
-  baseURL: 'http://localhost:3500',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3500',
   withCredentials: true,
 });
 

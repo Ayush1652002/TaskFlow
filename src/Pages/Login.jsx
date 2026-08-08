@@ -58,13 +58,14 @@ const Login = ({ setAuth }) => {
     try {
       const res = await axios.post("/auth/guest");
       setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
-    } catch {
+    } catch (err) {
       setError("Failed to start guest session");
     }
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = `${axios.defaults.baseURL}/auth/google`;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3500';
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   // ---- OTP verification screen ----
