@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useRef } from "react";
 import axios from "../api/axios";
 import { WorkspaceContext } from "../Context/workspaceContextObject";
 import toast from "react-hot-toast";
-
+// changed
 const formatSize = (bytes) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -54,8 +54,29 @@ const TaskAttachments = ({ task, onUpdated }) => {
       const updated = attachments.filter(a => a._id !== attachmentId);
       setAttachments(updated);
       onUpdated?.(updated);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete attachment");
+    }
+  };
+
+  // Files are no longer public links. We ask the API for the file WITH the login
+  // token, then save the received data under its original file name.
+  const handleDownload = async (attachment) => {
+    try {
+      const res = await axios.get(`${base}/${attachment._id}`, {
+        headers: authHeader,
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.originalName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch {
-      toast.error("Failed to delete attachment");
+      toast.error("Could not download this file");
     }
   };
 
@@ -67,14 +88,13 @@ const TaskAttachments = ({ task, onUpdated }) => {
         <div className="space-y-1.5">
           {attachments.map((a) => (
             <div key={a._id} className="flex items-center justify-between bg-[#1e1e1e] rounded-lg px-3 py-2">
-              <a
-                href={`${axios.defaults.baseURL}/uploads/${a.filename}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-200 hover:text-violet-400 transition truncate flex-1"
+              <button
+                type="button"
+                onClick={() => handleDownload(a)}
+                className="text-xs text-gray-200 hover:text-violet-400 transition truncate flex-1 text-left"
               >
                 📎 {a.originalName} <span className="text-gray-600">({formatSize(a.size)})</span>
-              </a>
+              </button>
               <button
                 onClick={() => handleDelete(a._id)}
                 aria-label={`Remove ${a.originalName}`}

@@ -1,12 +1,26 @@
 import { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
-import axios from "../api/axios";
+import axios, { clearCsrfToken } from "../api/axios";
 import useAxiosPrivate from '../hooks/useAxiosPrivate';
 import WorkspaceSwitcher from '../Components/WorkspaceSwitcher';
 import NotificationBell from '../Components/NotificationBell';
-
+// changed
 const Layout = ({ auth, setAuth }) => {
   useAxiosPrivate(auth, setAuth);
+
+  // Logging out must ALWAYS work for the user. If the server call fails
+  // (network error, expired session, missing CSRF), we still clear the local
+  // session instead of leaving the user stuck on a button that does nothing.
+  const handleLogout = async () => {
+    try {
+      await axios.post("/auth/logout");
+    } catch {
+      // ignore: the local logout below still happens
+    } finally {
+      clearCsrfToken();
+      setAuth(null);
+    }
+  };
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -100,10 +114,7 @@ const Layout = ({ auth, setAuth }) => {
         <div className="mt-auto">
           <p className="text-xs text-gray-600 px-2 mb-2">Logged in as {auth?.name}</p>
           <button
-            onClick={async () => {
-              await axios.post("/auth/logout");
-              setAuth(null);
-            }}
+            onClick={handleLogout}
             className="w-full text-sm px-3 py-2 rounded-lg text-red-400 hover:bg-[#1e1e1e] transition text-left"
           >
             Logout

@@ -7,7 +7,7 @@ const normalizeError = (err) => {
   if (err.name === 'CastError') {
     return new AppError(`Invalid ${err.path}: ${err.value}`, 400);
   }
-
+// changed
   // Mongoose schema validation failure (required fields, enum mismatch, etc.)
   if (err.name === 'ValidationError') {
     const message = Object.values(err.errors)
@@ -22,12 +22,22 @@ const normalizeError = (err) => {
     return new AppError(`${field} already exists`, 409);
   }
 
-  // Malformed or expired JWT that slipped past a manual jwt.verify callback
+  // Malformed or expired JWT that slipped past a manual jwt.verify callback.
+  // 401 = "you are not properly logged in" (403 is only for "logged in but not allowed").
   if (err.name === 'JsonWebTokenError') {
-    return new AppError('Invalid token', 403);
+    return new AppError('Invalid token', 401);
   }
   if (err.name === 'TokenExpiredError') {
-    return new AppError('Token expired', 403);
+    return new AppError('Token expired', 401);
+  }
+
+  // File upload problems from multer (too big, unexpected field) are the user's
+  // mistake, so answer 400 with a clear message instead of a 500.
+  if (err.name === 'MulterError') {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'File is too large (maximum 10 MB)'
+      : 'Upload failed: ' + err.message;
+    return new AppError(message, 400);
   }
 
   return err;

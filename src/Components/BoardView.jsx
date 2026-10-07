@@ -1,7 +1,7 @@
 import { useContext } from "react";
 import { TaskContext } from "../Context/taskContextObject";
 import { formatDueDate } from "../utils/dateHelpers";
-
+// changed
 const columns = [
   { id: "todo", label: "Todo" },
   { id: "inprogress", label: "In Progress" },
@@ -15,7 +15,7 @@ const priorityColors = {
 };
 
 const BoardView = () => {
-  const { tasks, updateTaskStatus, deleteTask, toggleTask } = useContext(TaskContext);
+  const { tasks, updateTaskStatus, deleteTask } = useContext(TaskContext);
 
   const getColumnTasks = (columnId) => {
     if (columnId === "done") return tasks.filter(t => t.completed);
@@ -98,10 +98,7 @@ const BoardView = () => {
                 )}
                 {col.id !== "done" && (
   <button
-    onClick={() => {
-      updateTaskStatus(task._id, "done");
-      if (!task.completed) toggleTask(task._id);
-    }}
+    onClick={() => updateTaskStatus(task._id, "done")}
     className="text-xs px-2 py-1 rounded-md bg-[#1e1e1e] text-violet-400 hover:text-violet-300 transition"
   >
     Done

@@ -9,6 +9,8 @@ const sendEmail = require('../utils/mailer');
 const generateOtp = require('../utils/generateOtp');
 const PendingInvite = require('../models/PendingInvite');
 const Workspace = require('../models/Workspace');
+const OAuthSession = require('../models/OAuthSession');
+// changed
 
 // Sets the httpOnly refresh-token cookie and the readable CSRF cookie together,
 // since every place that issues a refresh token needs both.
@@ -27,7 +29,22 @@ const setAuthCookies = (res, refreshToken) => {
     sameSite: 'None',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
+
+  // When the frontend and API are on DIFFERENT domains (Vercel + Render), the
+  // frontend cannot read this cookie with document.cookie. So we also hand the
+  // same value over in the JSON response (see sessionPayload) and the frontend
+  // keeps it for the x-csrf-token header.
+  res.locals.csrfToken = csrfToken;
 };
+
+// The JSON the frontend receives after any successful login/refresh.
+const sessionPayload = (res, accessToken, user, extra = {}) => ({
+  accessToken,
+  name: user.name,
+  id: user._id,
+  csrfToken: res.locals.csrfToken,
+  ...extra,
+});
 
 // Shared by login/Google/guest — signs both tokens, stores the refresh
 // token on the user doc, sets cookies, and returns what the JSON response needs.
@@ -111,7 +128,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
   await applyPendingInvites(user);
 
   const accessToken = await issueSession(res, user);
-  res.json({ accessToken, name: user.name, id: user._id });
+  res.json(sessionPayload(res, accessToken, user));
 });
 
 // POST /auth/resend-otp
@@ -149,23 +166,45 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isVerified) throw new AppError('Please verify your email before logging in', 403);
 
   const accessToken = await issueSession(res, user);
-  res.json({ accessToken, name: user.name, id: user._id });
+  res.json(sessionPayload(res, accessToken, user));
 });
 
 // GET /auth/google — redirect the browser to Google's consent screen
 const googleAuth = (req, res) => {
+  // "state" is a random value we remember in a cookie and Google sends back.
+  // If they do not match in the callback, someone else started this login
+  // (login CSRF), so we refuse it.
+  const state = crypto.randomBytes(24).toString('hex');
+  res.cookie('oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax', // Lax still sends the cookie when Google redirects the browser back
+    maxAge: 10 * 60 * 1000,
+  });
+
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['profile', 'email'],
     prompt: 'consent',
+    state,
   });
   res.redirect(url);
 };
 
 // GET /auth/google/callback — Google redirects here with a one-time ?code
 const googleCallback = asyncHandler(async (req, res) => {
-  const { code } = req.query;
-  if (!code) throw new AppError('Missing authorization code', 400);
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const { code, state } = req.query;
+
+  // User pressed "Cancel" on Google's screen, or Google reported an error:
+  // send them back to the app instead of showing raw JSON.
+  if (req.query.error || !code) return res.redirect(`${frontendUrl}/?login=cancelled`);
+
+  const stateCookie = req.cookies?.oauth_state;
+  res.clearCookie('oauth_state');
+  if (!state || !stateCookie || state !== stateCookie) {
+    throw new AppError('Invalid login state, please try again', 400);
+  }
 
   const { tokens } = await googleClient.getToken(code);
   const ticket = await googleClient.verifyIdToken({
@@ -194,14 +233,29 @@ const googleCallback = asyncHandler(async (req, res) => {
     await applyPendingInvites(user);
   }
 
-  const accessToken = await issueSession(res, user);
+  // IMPORTANT: the access token is never put in the URL. We only pass a random
+  // one-time code; the frontend swaps it for real tokens with a normal API call
+  // (POST /auth/google/exchange), where the cookies are also set.
+  const oneTimeCode = crypto.randomBytes(32).toString('hex');
+  await OAuthSession.create({ code: oneTimeCode, user: user._id });
 
-  // Cross-domain setup (Vercel frontend + Render backend) means the refresh
-  // cookie won't be sent back by the browser due to third-party cookie blocking.
-  // Solution: pass the accessToken in the redirect URL so the frontend can
-  // pick it up directly without needing to call /auth/refresh.
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  res.redirect(`${frontendUrl}?token=${accessToken}&name=${encodeURIComponent(user.name)}&id=${user._id}`);
+  res.redirect(`${frontendUrl}/?code=${oneTimeCode}`);
+});
+
+// POST /auth/google/exchange - body: { code }. The code works only once.
+const exchangeGoogleCode = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  if (!code || typeof code !== 'string') throw new AppError('Code is required', 400);
+
+  // findOneAndDelete is a single step, so two requests cannot both use the same code
+  const session = await OAuthSession.findOneAndDelete({ code });
+  if (!session) throw new AppError('Login code is invalid or expired', 400);
+
+  const user = await User.findById(session.user);
+  if (!user) throw new AppError('User not found', 404);
+
+  const accessToken = await issueSession(res, user);
+  res.json(sessionPayload(res, accessToken, user));
 });
 
 // POST /auth/guest — no email/password needed, creates a throwaway account
@@ -214,7 +268,7 @@ const guestLogin = asyncHandler(async (req, res) => {
   });
 
   const accessToken = await issueSession(res, user);
-  res.json({ accessToken, name: user.name, id: user._id, isGuest: true });
+  res.json(sessionPayload(res, accessToken, user, { isGuest: true }));
 });
 
 const refresh = asyncHandler(async (req, res) => {
@@ -228,7 +282,7 @@ const refresh = asyncHandler(async (req, res) => {
   try {
     decoded = jwt.verify(oldRefreshToken, process.env.REFRESH_TOKEN_SECRET);
   } catch (err) {
-    return res.status(403).json({ message: 'Forbidden' });
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
   }
 
   const user = await User.findById(decoded.id);
@@ -243,7 +297,7 @@ const refresh = asyncHandler(async (req, res) => {
     // it was stolen. Revoke every active session for this user as a precaution.
     user.refreshTokens = [];
     await user.save();
-    return res.status(403).json({ message: 'Refresh token reuse detected — all sessions revoked' });
+    return res.status(401).json({ message: 'Refresh token reuse detected - all sessions revoked' });
   }
 
   // Rotate: remove the old token, issue and store a new one
@@ -265,7 +319,7 @@ const refresh = asyncHandler(async (req, res) => {
 
   setAuthCookies(res, newRefreshToken);
 
-  res.json({ accessToken, name: user.name, id: user._id });
+  res.json(sessionPayload(res, accessToken, user));
 });
 
 const logout = asyncHandler(async (req, res) => {
@@ -284,4 +338,4 @@ const logout = asyncHandler(async (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-module.exports = { register, login, refresh, logout, googleAuth, googleCallback, guestLogin, verifyOtp, resendOtp };
+module.exports = { register, login, refresh, logout, googleAuth, googleCallback, exchangeGoogleCode, guestLogin, verifyOtp, resendOtp };

@@ -2,7 +2,7 @@ const Workspace = require('../models/Workspace');
 const User = require('../models/User');
 const PendingInvite = require('../models/PendingInvite');
 const sendEmail = require('../utils/mailer');
-
+// changed
 const slugify = (name) =>
   name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
 
@@ -30,6 +30,10 @@ const createWorkspace = async (req, res) => {
       owner: req.user.id,
       members: [{ user: req.user.id, role: 'owner' }],
     });
+
+    // Populate names so the new workspace shows real member names right away
+    // (otherwise the Members panel says "Unknown" until the page is reloaded).
+    await workspace.populate('members.user', 'name email');
 
     res.status(201).json(workspace);
   } catch (err) {

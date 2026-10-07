@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "../api/axios";
-
+// changed
 const Login = ({ setAuth }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [awaitingOtp, setAwaitingOtp] = useState(false);
@@ -12,7 +12,8 @@ const Login = ({ setAuth }) => {
   const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e?.preventDefault(); // used as a <form> onSubmit, so Enter key works
     setError("");
     setSubmitting(true);
     try {
@@ -31,7 +32,8 @@ const Login = ({ setAuth }) => {
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault();
     setError("");
     setSubmitting(true);
     try {
@@ -85,27 +87,29 @@ const Login = ({ setAuth }) => {
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="6-digit code"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            className="w-full bg-[#1e1e1e] border border-[#2e2e2e] rounded-lg px-4 py-2 text-sm text-white outline-none placeholder-gray-600 tracking-widest text-center"
-          />
+          <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="6-digit code"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              className="w-full bg-[#1e1e1e] border border-[#2e2e2e] rounded-lg px-4 py-2 text-sm text-white outline-none placeholder-gray-600 tracking-widest text-center"
+            />
 
-          <button
-            onClick={handleVerifyOtp}
-            disabled={submitting || otp.length !== 6}
-            className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
-          >
-            {submitting ? "Verifying..." : "Verify"}
-          </button>
+            <button
+              type="submit"
+              disabled={submitting || otp.length !== 6}
+              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
+            >
+              {submitting ? "Verifying..." : "Verify"}
+            </button>
+          </form>
 
           <p className="text-sm text-gray-500 text-center">
             Didn't get it?
-            <button onClick={handleResendOtp} className="text-violet-400 ml-1 hover:underline">
+            <button type="button" onClick={handleResendOtp} className="text-violet-400 ml-1 hover:underline">
               Resend code
             </button>
           </p>
@@ -135,6 +139,7 @@ const Login = ({ setAuth }) => {
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
+        <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-3">
           {isRegister && (
             <input
@@ -148,6 +153,7 @@ const Login = ({ setAuth }) => {
           <input
             type="email"
             placeholder="Email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-[#1e1e1e] border border-[#2e2e2e] rounded-lg px-4 py-2 text-sm text-white outline-none placeholder-gray-600"
@@ -155,6 +161,7 @@ const Login = ({ setAuth }) => {
           <input
             type="password"
             placeholder="Password"
+            autoComplete={isRegister ? "new-password" : "current-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full bg-[#1e1e1e] border border-[#2e2e2e] rounded-lg px-4 py-2 text-sm text-white outline-none placeholder-gray-600"
@@ -162,12 +169,13 @@ const Login = ({ setAuth }) => {
         </div>
 
         <button
-          onClick={handleSubmit}
+          type="submit"
           disabled={submitting}
           className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
         >
           {submitting ? "Please wait..." : isRegister ? "Register" : "Login"}
         </button>
+        </form>
 
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-[#2e2e2e]" />
@@ -176,6 +184,7 @@ const Login = ({ setAuth }) => {
         </div>
 
         <button
+          type="button"
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-gray-800 text-sm py-2 rounded-lg transition"
         >
@@ -189,6 +198,7 @@ const Login = ({ setAuth }) => {
         </button>
 
         <button
+          type="button"
           onClick={handleGuestLogin}
           className="w-full bg-[#1e1e1e] hover:bg-[#2e2e2e] text-gray-300 text-sm py-2 rounded-lg transition"
         >
@@ -198,6 +208,7 @@ const Login = ({ setAuth }) => {
         <p className="text-sm text-gray-500 text-center">
           {isRegister ? "Already have an account?" : "Don't have an account?"}
           <button
+            type="button"
             onClick={() => { setIsRegister(!isRegister); setError(""); }}
             className="text-violet-400 ml-1 hover:underline"
           >

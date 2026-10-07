@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Routes, Route } from "react-router-dom";
 import Layout from "./Layout/Layout.jsx";
 import Dashboard from "./Pages/Dashboard.jsx";
@@ -14,30 +14,35 @@ import { WorkspaceContext } from "./Context/workspaceContextObject";
 import { useContext } from "react";
 import NotFound from "./Pages/NotFound";
 import { Toaster } from "react-hot-toast";
-
+// changed
 const App = () => {
   const [auth, setAuth] = useState(null);
-  const [loading, setLoading] = useState(true); 
+  const [loading, setLoading] = useState(true);
+  // React StrictMode runs effects twice in development. A one-time Google code
+  // can only be used once, and a double /auth/refresh would trigger the
+  // server's "token reuse" protection, so we make sure this runs only once.
+  const bootstrapped = useRef(false);
 
   useEffect(() => {
-    // Google OAuth redirect lands here with ?token=...&name=...&id=...
-    // Pick it up directly instead of calling /auth/refresh (cross-domain cookies get blocked)
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const name = params.get('name');
-    const id = params.get('id');
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
 
-    if (token && name && id) {
-      setAuth({ accessToken: token, name, id });
-      // Clean the URL so token doesn't stay in browser history
-      window.history.replaceState({}, '', window.location.pathname);
-      setLoading(false);
-      return;
+    const params = new URLSearchParams(window.location.search);
+    const googleCode = params.get("code");
+    const loginCancelled = params.get("login") === "cancelled";
+
+    // Remove ?code=... from the address bar right away
+    if (googleCode || loginCancelled) {
+      window.history.replaceState({}, "", window.location.pathname);
     }
 
-    const refresh = async () => {
+    const bootstrap = async () => {
       try {
-        const res = await axios.get("/auth/refresh");
+        // Google sign-in: swap the one-time code for real tokens (the access
+        // token itself is never placed in the URL).
+        const res = googleCode
+          ? await axios.post("/auth/google/exchange", { code: googleCode })
+          : await axios.get("/auth/refresh");
         setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
       } catch {
         setAuth(null);
@@ -45,7 +50,7 @@ const App = () => {
         setLoading(false);
       }
     };
-    refresh();
+    bootstrap();
   }, []);
 
   if (loading) return (
@@ -54,7 +59,7 @@ const App = () => {
     </div>
   );
 
-  if (!auth) return (
+  return (
     <>
       <Toaster
         position="top-right"
@@ -63,24 +68,15 @@ const App = () => {
           style: { background: '#1e1e1e', color: '#fff', border: '1px solid #2e2e2e' },
         }}
       />
-      <Login setAuth={setAuth} />
+      {!auth ? (
+        <Login setAuth={setAuth} />
+      ) : (
+        <WorkspaceProvider auth={auth}>
+          <AppRoutes auth={auth} setAuth={setAuth} />
+        </WorkspaceProvider>
+      )}
     </>
   );
-
-return (
-  <>
-    <Toaster
-      position="top-right"
-      containerStyle={{ zIndex: 999999 }}
-      toastOptions={{
-        style: { background: '#1e1e1e', color: '#fff', border: '1px solid #2e2e2e' },
-      }}
-    />
-    <WorkspaceProvider auth={auth}>
-      <AppRoutes auth={auth} setAuth={setAuth} />
-    </WorkspaceProvider>
-  </>
-);
 };
 
 // Separate component so it can read activeWorkspace from context

@@ -4,7 +4,7 @@ import { WorkspaceContext } from "../Context/workspaceContextObject";
 import MembersPanel from "../Components/MembersPanel";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
-
+// changed
 const Settings = () => {
   const [userName, setUserName] = useState("");
   const [defaultPriority, setDefaultPriority] = useState("Medium");
@@ -170,28 +170,31 @@ const Settings = () => {
       <div className="bg-[#141414] border border-red-900/30 rounded-xl p-6 space-y-4">
         <h2 className="text-sm font-medium text-red-400">Danger Zone</h2>
 
-        <div className="space-y-2">
-          <p className="text-xs text-gray-500">Moves every task in this workspace to Trash (recoverable for 30 days).</p>
-          {!confirmingClear ? (
-            <button onClick={() => setConfirmingClear(true)}
-              aria-label="Clear all tasks in this workspace"
-              className="bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm px-4 py-2 rounded-lg transition">
-              Clear All Tasks
-            </button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <p className="text-xs text-red-400">Move all tasks to Trash?</p>
-              <button onClick={() => { handleClearTasks(); setConfirmingClear(false); }}
-                className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg">
-                Confirm
+        {/* Backend also enforces this (manager, admin or owner only) - the UI just hides the button */}
+        {["owner", "admin", "manager"].includes(myRole) && (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">Moves every task in this workspace to Trash (recoverable for 30 days).</p>
+            {!confirmingClear ? (
+              <button onClick={() => setConfirmingClear(true)}
+                aria-label="Clear all tasks in this workspace"
+                className="bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm px-4 py-2 rounded-lg transition">
+                Clear All Tasks
               </button>
-              <button onClick={() => setConfirmingClear(false)}
-                className="text-xs px-3 py-1.5 bg-[#1e1e1e] text-gray-400 rounded-lg">
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-red-400">Move all tasks to Trash?</p>
+                <button onClick={() => { handleClearTasks(); setConfirmingClear(false); }}
+                  className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg">
+                  Confirm
+                </button>
+                <button onClick={() => setConfirmingClear(false)}
+                  className="text-xs px-3 py-1.5 bg-[#1e1e1e] text-gray-400 rounded-lg">
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {myRole === "owner" && activeWorkspace && (
           <div className="space-y-2 pt-4 border-t border-red-900/20">

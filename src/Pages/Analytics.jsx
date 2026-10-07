@@ -1,21 +1,41 @@
-import { useContext } from "react";
-import { TaskContext } from "../Context/taskContextObject";
+import { useContext, useEffect, useState } from "react";
+import axios from "../api/axios";
+import { WorkspaceContext } from "../Context/workspaceContextObject";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-
+// changed
 const Analytics = () => {
-  const { tasks } = useContext(TaskContext);
-  const safeTasks = tasks || [];
+  const { activeWorkspace, auth } = useContext(WorkspaceContext);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
-  const completed = safeTasks.filter(t => t.completed).length;
-  const pending = safeTasks.filter(t => !t.completed).length;
-  const total = safeTasks.length;
+  // The numbers now come from the server, counted over EVERY task in the
+  // workspace. Before, this page only counted the 10 tasks on the dashboard's
+  // current page (and showed nothing until you had visited the dashboard).
+  useEffect(() => {
+    if (!activeWorkspace?._id || !auth?.accessToken) return;
+    let cancelled = false;
+
+    // "Overdue" should follow the user's own midnight, not the server's
+    const todayStart = new Date(new Date().toDateString()).toISOString();
+
+    axios
+      .get(`/analytics/${activeWorkspace._id}`, {
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+        params: { todayStart },
+      })
+      .then((res) => { if (!cancelled) { setData(res.data); setFailed(false); } })
+      .catch(() => { if (!cancelled) setFailed(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [activeWorkspace?._id, auth?.accessToken]);
+
+  const completed = data?.completed ?? 0;
+  const pending = data?.pending ?? 0;
+  const total = data?.total ?? 0;
+  const overdueCount = data?.overdue ?? 0;
   const completionRate = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-  const overdueCount = safeTasks.filter(t =>
-    t.dueDate &&
-    new Date(t.dueDate) < new Date(new Date().toDateString()) &&
-    !t.completed
-  ).length;
 
   const pieData = [
     { name: "Completed", value: completed },
@@ -23,15 +43,12 @@ const Analytics = () => {
   ];
 
   const priorityData = [
-    { name: "High", value: safeTasks.filter(t => t.priority === "High").length },
-    { name: "Medium", value: safeTasks.filter(t => t.priority === "Medium").length },
-    { name: "Low", value: safeTasks.filter(t => t.priority === "Low").length },
+    { name: "High", value: data?.priority?.High ?? 0 },
+    { name: "Medium", value: data?.priority?.Medium ?? 0 },
+    { name: "Low", value: data?.priority?.Low ?? 0 },
   ];
 
-  const categoryData = ["Work", "Personal", "College", "Health", "General"].map(cat => ({
-    name: cat,
-    value: safeTasks.filter(t => t.category === cat).length,
-  })).filter(d => d.value > 0);
+  const categoryData = (data?.categories || []).filter(d => d.value > 0);
 
   const COLORS = ["#7c3aed", "#1e1e2e"];
 
@@ -40,6 +57,14 @@ const Analytics = () => {
 
   const completionBarColor = completionRate >= 70 ? "bg-green-500" :
     completionRate >= 30 ? "bg-yellow-500" : "bg-red-500";
+
+  if (loading) return (
+    <p className="text-sm text-gray-500">Loading analytics...</p>
+  );
+
+  if (failed) return (
+    <p className="text-sm text-red-400">Could not load analytics. Please try again.</p>
+  );
 
   if (total === 0) return (
     <div className="space-y-8">

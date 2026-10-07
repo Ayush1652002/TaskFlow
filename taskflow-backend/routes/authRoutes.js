@@ -3,8 +3,8 @@ const router = express.Router();
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
 const verifyCsrf = require('../middleware/verifyCsrf');
-const { register, login, refresh, logout, googleAuth, googleCallback, guestLogin, verifyOtp, resendOtp } = require('../controllers/authControllers');
-
+const { register, login, refresh, logout, googleAuth, googleCallback, exchangeGoogleCode, guestLogin, verifyOtp, resendOtp } = require('../controllers/authControllers');
+// changed
 router.post('/register', [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Valid email is required'),
@@ -32,6 +32,7 @@ router.post('/logout', verifyCsrf, logout);
 
 router.get('/google', googleAuth);
 router.get('/google/callback', googleCallback);
+router.post('/google/exchange', exchangeGoogleCode);
 
 router.post('/guest', guestLogin);
 

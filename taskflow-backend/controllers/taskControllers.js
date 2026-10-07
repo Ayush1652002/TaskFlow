@@ -1,26 +1,26 @@
+const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const logActivity = require('../utils/logActivity');
 const notify = require('../utils/notify');
+const canModifyTask = require('../utils/canModifyTask');
+// changed
 
-// Owner/admin/manager can modify any task in the workspace. A plain
-// "member" can only modify a task they created or are assigned to —
-// this is what stops one member from editing/deleting someone else's work.
-const canModifyTask = (req, task) => {
-  const elevatedRoles = ['owner', 'admin', 'manager'];
-  if (elevatedRoles.includes(req.membership.role)) return true;
-  if (task.user.toString() === req.user.id) return true;
-  if (task.assignee && task.assignee.toString() === req.user.id) return true;
-  return false;
-};
+// Makes user text safe to put inside a MongoDB regex ("(" or "[" would crash it,
+// and tricky patterns can freeze the database).
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Query values must be plain strings (?search=a&search=b would give an array).
+const asString = (value) => (typeof value === 'string' ? value : '');
 
 const getAllTasks = asyncHandler(async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const search = req.query.search || '';
-  const status = req.query.status || '';
-  const priority = req.query.priority || '';
+  // page >= 1 and 1 <= limit <= 50, so nobody can ask for 100000 rows or a negative page
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+  const search = asString(req.query.search).trim().slice(0, 100);
+  const status = asString(req.query.status);
+  const priority = asString(req.query.priority);
   const assignedToMe = req.query.assignedToMe === 'true';
 
   const SORTABLE_FIELDS = ['createdAt', 'dueDate', 'priority', 'title', 'order'];
@@ -29,10 +29,10 @@ const getAllTasks = asyncHandler(async (req, res) => {
 
   const query = { workspace: req.workspace._id, deletedAt: null };
 
-  if (search) query.title = { $regex: search, $options: 'i' };
+  if (search) query.title = { $regex: escapeRegex(search), $options: 'i' };
   if (status === 'completed') query.completed = true;
   if (status === 'pending') query.completed = false;
-  if (priority) query.priority = priority;
+  if (['Low', 'Medium', 'High'].includes(priority)) query.priority = priority;
   if (assignedToMe) query.assignee = req.user.id;
 
   const total = await Task.countDocuments(query);
@@ -42,12 +42,25 @@ const getAllTasks = asyncHandler(async (req, res) => {
     .skip((page - 1) * limit)
     .limit(limit);
 
+  // Numbers for the three dashboard cards. They describe the WHOLE workspace
+  // (not just the 10 tasks on this page, and not affected by search/filter).
+  const base = { workspace: req.workspace._id, deletedAt: null };
+  const [completedCount, pendingCount] = await Promise.all([
+    Task.countDocuments({ ...base, completed: true }),
+    Task.countDocuments({ ...base, completed: false }),
+  ]);
+
   res.json({
     tasks,
     total,
     page,
     totalPages: Math.ceil(total / limit),
     hasMore: page < Math.ceil(total / limit),
+    stats: {
+      total: completedCount + pendingCount,
+      completed: completedCount,
+      pending: pendingCount,
+    },
   });
 });
 
@@ -126,12 +139,28 @@ const createTask = asyncHandler(async (req, res) => {
 
 const reorderTasks = asyncHandler(async (req, res) => {
   const { orderedIds } = req.body;
-  if (!Array.isArray(orderedIds)) throw new AppError('orderedIds must be an array', 400);
+  if (!Array.isArray(orderedIds) || orderedIds.length > 100) {
+    throw new AppError('orderedIds must be an array of at most 100 ids', 400);
+  }
+  if (!orderedIds.every((id) => mongoose.isValidObjectId(id))) {
+    throw new AppError('orderedIds contains an invalid id', 400);
+  }
+  if (new Set(orderedIds.map(String)).size !== orderedIds.length) {
+    throw new AppError('orderedIds contains duplicates', 400);
+  }
 
+  // The ids sent are only the tasks on the CURRENT page. We must not give them
+  // order 0,1,2... (page 1 already uses those numbers, which scrambled the list).
+  // Instead we re-use the "order slots" these same tasks already had, sorted
+  // from small to big, and hand them out in the new sequence.
+  const existing = await Task.find({ _id: { $in: orderedIds }, workspace: req.workspace._id, deletedAt: null }).select('order');
+  if (existing.length !== orderedIds.length) throw new AppError('Some tasks were not found in this workspace', 404);
+
+  const slots = existing.map((t) => t.order).sort((a, b) => a - b);
   const ops = orderedIds.map((id, index) => ({
     updateOne: {
       filter: { _id: id, workspace: req.workspace._id },
-      update: { order: index },
+      update: { order: slots[index] },
     },
   }));
 
@@ -267,6 +296,25 @@ const deleteTask = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE /tasks/:workspaceId - moves EVERY task to trash. The route requires
+// manager role or higher (a plain member must not wipe other people's work).
+const clearAllTasks = asyncHandler(async (req, res) => {
+  const result = await Task.updateMany(
+    { workspace: req.workspace._id, deletedAt: null },
+    { deletedAt: new Date() }
+  );
+
+  logActivity({
+    workspace: req.workspace._id,
+    task: null,
+    user: req.user.id,
+    type: 'task_deleted',
+    message: `moved all tasks to trash (${result.modifiedCount})`,
+  });
+
+  res.json({ message: 'All tasks moved to trash' });
+});
+
 // GET /tasks/:workspaceId/trash — deleted tasks from the last 30 days
 const getTrash = asyncHandler(async (req, res) => {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -306,4 +354,4 @@ const purgeTask = asyncHandler(async (req, res) => {
   res.json({ message: 'Task permanently deleted' });
 });
 
-module.exports = { getAllTasks, createTask, updateTask, deleteTask, reorderTasks, getTrash, restoreTask, purgeTask };
+module.exports = { getAllTasks, createTask, updateTask, deleteTask, clearAllTasks, reorderTasks, getTrash, restoreTask, purgeTask };
