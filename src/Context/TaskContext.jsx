@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import axios from "../api/axios";
 import toast from 'react-hot-toast';
 import { TaskContext } from "./taskContextObject";
-// changed
-const PAGE_SIZE = 10;
 
 // What the dashboard is currently showing. Search, filter, sort and page all
 // live HERE (one place), and every change is sent to the server.
 // Before, search/filter only worked on the 10 rows already loaded in the browser.
-const DEFAULT_QUERY = { page: 1, search: '', filter: 'all', priority: '', sortBy: 'order', order: 'asc' };
+// limit = tasks per page: 10 in list view, 100 in board view (so the board shows every task)
+const DEFAULT_QUERY = { page: 1, limit: 10, search: '', filter: 'all', priority: '', sortBy: 'order', order: 'asc' };
 
 const errorMessage = (err, fallback) => err?.response?.data?.message || fallback;
 
@@ -50,7 +49,7 @@ const TaskProvider = ({ children, auth, activeWorkspace }) => {
       if (showSpinner) setLoading(true);
       const params = new URLSearchParams({
         page: query.page,
-        limit: PAGE_SIZE,
+        limit: query.limit,
         sortBy: query.sortBy,
         order: query.order,
         ...(query.search && { search: query.search }),
@@ -79,6 +78,16 @@ const TaskProvider = ({ children, auth, activeWorkspace }) => {
   // After any change we reload the current page quietly (no spinner) so that
   // sorting, page size and the stats cards always match what the server has.
   const refresh = () => fetchTasks({ showSpinner: false });
+
+  // Called by TaskAttachments after an upload/delete. We put the new list into the
+  // task right away, and then reload the page quietly. Reloading also cancels any
+  // older reload that is still in flight - before this, such a late answer (which
+  // did not know about the new file yet) could overwrite the list and make the
+  // attachment disappear until the task was opened again.
+  const updateTaskAttachments = (id, attachments) => {
+    setTasks(prev => prev.map(t => t._id === id ? { ...t, attachments } : t));
+    refresh();
+  };
 
   const addTask = async ({ title, priority, dueDate, description, category, recurrence, assignee }) => {
     if (!wsId) {
@@ -205,6 +214,7 @@ const TaskProvider = ({ children, auth, activeWorkspace }) => {
       reorderTasks,
       updateTaskStatus,
       clearAllTasks,
+      updateTaskAttachments,
       totalPages,
       currentPage,
       fetchTasks,

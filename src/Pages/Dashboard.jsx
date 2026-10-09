@@ -7,7 +7,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import BoardView from "../Components/BoardView";
 import TaskSkeleton from '../Components/TaskSkeleton';
-// changed
+
 const Dashboard = ({ auth }) => {
   const { tasks, loading, stats, query, setQuery, totalPages, currentPage, addTask, reorderTasks } = useContext(TaskContext);
   const { activeWorkspace, loading: workspacesLoading, createWorkspace } = useContext(WorkspaceContext);
@@ -43,12 +43,27 @@ const Dashboard = ({ auth }) => {
     setRecurrence("none");
   };
 
+  // Sort buttons work in 3 clicks: 1st = ascending, 2nd = descending, 3rd = sort off
+  // (back to your own manual order, which is the order drag-and-drop uses).
+  // The current page is kept - before, sorting threw you back to page 1.
   const handleSortChange = (field) => {
-    // Clicking the same field again flips direction; picking a new field defaults to ascending
-    const nextOrder = field === sortBy && sortOrder === "asc" ? "desc" : "asc";
-    setQuery({ sortBy: field, order: nextOrder });
+    if (field !== sortBy) {
+      setQuery({ sortBy: field, order: "asc", page: currentPage });
+    } else if (sortOrder === "asc") {
+      setQuery({ sortBy: field, order: "desc", page: currentPage });
+    } else {
+      setQuery({ sortBy: "order", order: "asc", page: currentPage });
+    }
   };
 
+  // Board view shows EVERY task in its three columns (up to 100), list view shows
+  // 10 per page. Switching view changes how many tasks we ask the server for.
+  useEffect(() => {
+    const wantedLimit = view === "board" ? 100 : 10;
+    if (query.limit !== wantedLimit) {
+      setQuery({ limit: wantedLimit, ...(view === "board" && { filter: "all" }) });
+    }
+  }, [view, query.limit, setQuery]);
   const handleCreateFirstWorkspace = async (e) => {
     e.preventDefault();
     if (!firstWorkspaceName.trim()) return;
@@ -220,7 +235,7 @@ const Dashboard = ({ auth }) => {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-          {["all", "completed", "pending"].map((f) => (
+          {view === "list" && ["all", "completed", "pending"].map((f) => (
             <button
               key={f}
               onClick={() => setQuery({ filter: f })}
@@ -247,6 +262,7 @@ const Dashboard = ({ auth }) => {
                 key={field}
                 onClick={() => handleSortChange(field)}
                 aria-pressed={sortBy === field}
+                title={sortBy === field && sortOrder === "desc" ? "Click to turn sorting off" : "Click to sort (click again to reverse, a third time to turn off)"}
                 className={`text-xs px-3 py-1.5 rounded-lg transition ${
                   sortBy === field ? "bg-violet-600 text-white" : "bg-[#1e1e1e] text-gray-400 hover:text-white"
                 }`}
@@ -293,7 +309,13 @@ const Dashboard = ({ auth }) => {
         <BoardView />
       )}
 
-      {totalPages > 1 && (
+      {view === "board" && stats.total > tasks.length && (
+        <p className="text-xs text-gray-500 text-center">
+          Showing the first {tasks.length} tasks. Use search to find the others.
+        </p>
+      )}
+
+      {view === "list" && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
           <button
             onClick={() => setQuery({ page: currentPage - 1 })}

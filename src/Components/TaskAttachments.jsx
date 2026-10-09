@@ -1,8 +1,8 @@
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useContext, useRef } from "react";
 import axios from "../api/axios";
 import { WorkspaceContext } from "../Context/workspaceContextObject";
 import toast from "react-hot-toast";
-// changed
+
 const formatSize = (bytes) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -11,11 +11,11 @@ const formatSize = (bytes) => {
 
 const TaskAttachments = ({ task, onUpdated }) => {
   const { activeWorkspace, auth } = useContext(WorkspaceContext);
-  const [attachments, setAttachments] = useState(task.attachments || []);
+  // The list comes straight from the task (one source of truth). Before, this
+  // component kept its own copy, which could be wiped by a late task reload.
+  const attachments = task.attachments || [];
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-
-  useEffect(() => setAttachments(task.attachments || []), [task.attachments]);
 
   const base = `/tasks/${activeWorkspace?._id}/${task._id}/attachments`;
   const authHeader = { Authorization: `Bearer ${auth?.accessToken}` };
@@ -36,9 +36,7 @@ const TaskAttachments = ({ task, onUpdated }) => {
       const res = await axios.post(base, formData, {
         headers: { ...authHeader, "Content-Type": "multipart/form-data" },
       });
-      const updated = [...attachments, res.data];
-      setAttachments(updated);
-      onUpdated?.(updated);
+      onUpdated?.([...attachments, res.data]);
       toast.success("File attached");
     } catch (err) {
       toast.error(err.response?.data?.message || "Upload failed");
@@ -51,9 +49,7 @@ const TaskAttachments = ({ task, onUpdated }) => {
   const handleDelete = async (attachmentId) => {
     try {
       await axios.delete(`${base}/${attachmentId}`, { headers: authHeader });
-      const updated = attachments.filter(a => a._id !== attachmentId);
-      setAttachments(updated);
-      onUpdated?.(updated);
+      onUpdated?.(attachments.filter(a => a._id !== attachmentId));
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete attachment");
     }
@@ -70,11 +66,17 @@ const TaskAttachments = ({ task, onUpdated }) => {
       const url = URL.createObjectURL(res.data);
       const link = document.createElement("a");
       link.href = url;
-      link.download = attachment.originalName;
+      if (/\.(png|jpe?g|gif|webp|pdf)$/i.test(attachment.originalName)) {
+        // images and PDFs open in a new tab so you can LOOK at them
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      } else {
+        link.download = attachment.originalName; // other files are saved
+      }
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch {
       toast.error("Could not download this file");
     }

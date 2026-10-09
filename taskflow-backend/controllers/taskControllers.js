@@ -5,7 +5,6 @@ const AppError = require('../utils/AppError');
 const logActivity = require('../utils/logActivity');
 const notify = require('../utils/notify');
 const canModifyTask = require('../utils/canModifyTask');
-// changed
 
 // Makes user text safe to put inside a MongoDB regex ("(" or "[" would crash it,
 // and tricky patterns can freeze the database).
@@ -15,9 +14,11 @@ const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const asString = (value) => (typeof value === 'string' ? value : '');
 
 const getAllTasks = asyncHandler(async (req, res) => {
-  // page >= 1 and 1 <= limit <= 50, so nobody can ask for 100000 rows or a negative page
+  // page >= 1 and 1 <= limit <= 100, so nobody can ask for 100000 rows or a negative page.
+  // The list view asks for 10 per page; the board view asks for 100 so it can show
+  // every task in its columns instead of just one page.
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
   const search = asString(req.query.search).trim().slice(0, 100);
   const status = asString(req.query.status);
   const priority = asString(req.query.priority);
@@ -33,14 +34,43 @@ const getAllTasks = asyncHandler(async (req, res) => {
   if (status === 'completed') query.completed = true;
   if (status === 'pending') query.completed = false;
   if (['Low', 'Medium', 'High'].includes(priority)) query.priority = priority;
-  if (assignedToMe) query.assignee = req.user.id;
+  if (assignedToMe) query.assignee = new mongoose.Types.ObjectId(req.user.id);
 
   const total = await Task.countDocuments(query);
-  const tasks = await Task.find(query)
-    .populate('assignee', 'name email')
-    .sort({ [sortBy]: sortOrder, createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit);
+
+  let tasks;
+  if (sortBy === 'priority') {
+    // Priority is saved as text, and sorting text gives High, Low, Medium (alphabet).
+    // We sort by MEANING instead: High = 3, Medium = 2, Low = 1.
+    // Ascending arrow (up) = High first, because the most urgent work is what you want to see first.
+    const rank = {
+      $switch: {
+        branches: [
+          { case: { $eq: ['$priority', 'High'] }, then: 3 },
+          { case: { $eq: ['$priority', 'Medium'] }, then: 2 },
+        ],
+        default: 1,
+      },
+    };
+    const pageRows = await Task.aggregate([
+      { $match: query },
+      { $addFields: { priorityRank: rank } },
+      { $sort: { priorityRank: sortOrder === 1 ? -1 : 1, order: 1, createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+      { $project: { _id: 1 } },
+    ]);
+    const pageIds = pageRows.map((row) => row._id);
+    const found = await Task.find({ _id: { $in: pageIds } }).populate('assignee', 'name email');
+    const byId = new Map(found.map((task) => [task._id.toString(), task]));
+    tasks = pageIds.map((id) => byId.get(id.toString())).filter(Boolean); // keep the sorted order
+  } else {
+    tasks = await Task.find(query)
+      .populate('assignee', 'name email')
+      .sort({ [sortBy]: sortOrder, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+  }
 
   // Numbers for the three dashboard cards. They describe the WHOLE workspace
   // (not just the 10 tasks on this page, and not affected by search/filter).

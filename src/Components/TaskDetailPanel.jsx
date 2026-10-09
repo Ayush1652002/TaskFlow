@@ -6,7 +6,7 @@ import TaskHistory from "./TaskHistory";
 import TaskAttachments from "./TaskAttachments";
 
 const TaskDetailPanel = ({ task, onClose }) => {
-  const { editTask, toggleTask, deleteTask } = useContext(TaskContext);
+  const { editTask, toggleTask, deleteTask, updateTaskAttachments } = useContext(TaskContext);
   const { activeWorkspace } = useContext(WorkspaceContext);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
@@ -175,7 +175,7 @@ const TaskDetailPanel = ({ task, onClose }) => {
         </div>
 
         <hr className="border-[#1e1e1e]" />
-        <TaskAttachments task={task} />
+        <TaskAttachments task={task} onUpdated={(list) => updateTaskAttachments(task._id, list)} />
 
         <hr className="border-[#1e1e1e]" />
         <TaskComments taskId={task._id} />
