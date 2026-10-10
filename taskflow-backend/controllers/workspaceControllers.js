@@ -65,7 +65,7 @@ const addMember = async (req, res) => {
         invitedBy: req.user.id,
       });
 
-      await sendEmail({
+      sendEmail({
         to: email,
         subject: `You've been invited to "${req.workspace.name}" on TaskFlow`,
         html: `<p>You've been invited to join the workspace <strong>${req.workspace.name}</strong> on TaskFlow.</p><p>Create an account with this email address to join automatically: <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL}</a></p>`,
@@ -81,7 +81,7 @@ const addMember = async (req, res) => {
     await req.workspace.save();
     await req.workspace.populate('members.user', 'name email');
 
-    await sendEmail({
+    sendEmail({
       to: email,
       subject: `You've been added to "${req.workspace.name}" on TaskFlow`,
       html: `<p>You've been added to the workspace <strong>${req.workspace.name}</strong> as a <strong>${role}</strong>.</p>`,
