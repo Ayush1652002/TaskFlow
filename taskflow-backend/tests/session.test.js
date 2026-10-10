@@ -94,4 +94,20 @@ describe('Session retention', () => {
     const res = await request(app).get('/auth/refresh').set({ Origin: ORIGIN });
     expect(res.status).toBe(401);
   });
+
+  it('a Vercel preview URL of this project is allowed, other sites are not', async () => {
+    const l = await login();
+    const ok = await refresh(cookieOf(l, 'jwt'), { Origin: 'https://task-flow-abc123-ayushsahares-projects.vercel.app' });
+    expect(ok.status).toBe(200);
+    const bad = await refresh(cookieOf(l, 'jwt'), { Origin: 'https://task-flow-abc123-someone-else.vercel.app' });
+    expect(bad.status).toBe(403);
+  });
+
+  it('google login remembers the preview origin it started from', async () => {
+    const origin = 'https://task-flow-abc123-ayushsahares-projects.vercel.app';
+    const res = await request(app).get('/auth/google').query({ origin });
+    expect((res.headers['set-cookie'] || []).some((c) => c.startsWith('oauth_origin='))).toBe(true);
+    const evil = await request(app).get('/auth/google').query({ origin: 'https://evil.example' });
+    expect((evil.headers['set-cookie'] || []).some((c) => c.startsWith('oauth_origin='))).toBe(false);
+  });
 });

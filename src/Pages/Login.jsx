@@ -67,7 +67,7 @@ const Login = ({ setAuth }) => {
 
   const handleGoogleLogin = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3500';
-    window.location.href = `${apiUrl}/auth/google`;
+    window.location.href = `${apiUrl}/auth/google?origin=${encodeURIComponent(window.location.origin)}`;
   };
 
   // ---- OTP verification screen ----

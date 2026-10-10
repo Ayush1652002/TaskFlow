@@ -1,5 +1,5 @@
 const AppError = require('../utils/AppError');
-const allowedOrigins = require('../config/origins');
+const { isAllowedOrigin } = require('../config/origins');
 
 // /auth/refresh and /auth/logout rely only on the httpOnly cookie, so they need
 // CSRF protection. A request is accepted if EITHER:
@@ -16,7 +16,7 @@ const verifyCsrf = (req, res, next) => {
   if (cookieToken && headerToken && cookieToken === headerToken) return next();
 
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) return next();
+  if (isAllowedOrigin(origin)) return next();
 
   return next(new AppError('Invalid or missing CSRF token', 403));
 };

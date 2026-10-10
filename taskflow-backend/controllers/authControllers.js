@@ -10,6 +10,7 @@ const generateOtp = require('../utils/generateOtp');
 const PendingInvite = require('../models/PendingInvite');
 const Workspace = require('../models/Workspace');
 const OAuthSession = require('../models/OAuthSession');
+const { isAllowedOrigin } = require('../config/origins');
 // changed
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -195,6 +196,18 @@ const googleAuth = (req, res) => {
     maxAge: 10 * 60 * 1000,
   });
 
+  // Remember WHICH frontend started the login (production or a Vercel preview)
+  // so the callback sends the user back to the same place.
+  const from = req.query.origin;
+  if (isAllowedOrigin(from)) {
+    res.cookie('oauth_origin', from, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 10 * 60 * 1000,
+    });
+  }
+
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['profile', 'email'],
@@ -206,7 +219,11 @@ const googleAuth = (req, res) => {
 
 // GET /auth/google/callback — Google redirects here with a one-time ?code
 const googleCallback = asyncHandler(async (req, res) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const savedOrigin = req.cookies?.oauth_origin;
+  res.clearCookie('oauth_origin');
+  const frontendUrl = isAllowedOrigin(savedOrigin)
+    ? savedOrigin
+    : (process.env.FRONTEND_URL || 'http://localhost:5173');
   const { code, state } = req.query;
 
   // User pressed "Cancel" on Google's screen, or Google reported an error:
