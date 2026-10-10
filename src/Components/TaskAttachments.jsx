@@ -11,8 +11,6 @@ const formatSize = (bytes) => {
 
 const TaskAttachments = ({ task, onUpdated }) => {
   const { activeWorkspace, auth } = useContext(WorkspaceContext);
-  // The list comes straight from the task (one source of truth). Before, this
-  // component kept its own copy, which could be wiped by a late task reload.
   const attachments = task.attachments || [];
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -55,30 +53,33 @@ const TaskAttachments = ({ task, onUpdated }) => {
     }
   };
 
-  // Files are no longer public links. We ask the API for the file WITH the login
-  // token, then save the received data under its original file name.
+  // Downloads the file with authentication token and triggers the OS Save prompt
   const handleDownload = async (attachment) => {
     try {
       const res = await axios.get(`${base}/${attachment._id}`, {
         headers: authHeader,
         responseType: "blob",
       });
-      const url = URL.createObjectURL(res.data);
+
+      // Construct blob with safe content type fallback
+      const blob = new Blob([res.data], {
+        type: res.headers["content-type"] || "application/octet-stream",
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      if (/\.(png|jpe?g|gif|webp|pdf)$/i.test(attachment.originalName)) {
-        // images and PDFs open in a new tab so you can LOOK at them
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-      } else {
-        link.download = attachment.originalName; // other files are saved
-      }
+      // Always specify link.download to trigger the browser's native Save As prompt
+      link.setAttribute("download", attachment.originalName);
       document.body.appendChild(link);
       link.click();
+
+      // Clean up link and revoke temporary object URL
       link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      toast.error("Could not download this file");
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Download error details:", err);
+      toast.error(err.response?.data?.message || "Could not download this file");
     }
   };
 

@@ -57,9 +57,10 @@ const taskSchema = new mongoose.Schema({
     default: 0,
   },
   attachments: [{
-    filename: String,       // stored name on disk (unique, safe)
+    filename: String,       // stored name / Cloudinary public_id
     originalName: String,   // name to show the user
     size: Number,           // bytes
+    url: String,            // secure HTTPS Cloudinary URL
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     uploadedAt: { type: Date, default: Date.now },
   }],

@@ -1,18 +1,17 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const AppError = require('../utils/AppError');
-// changed
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
-// Make sure the folder exists (a fresh local clone does not have it,
-// and multer would fail with a 500 error on the first upload).
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Configure Cloudinary with environment variables
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Only these file types may be attached. Both the extension AND the type the
-// browser reports must be on the list. .html/.js/.svg/.exe are NOT allowed,
-// because they can run code if someone opens them.
+// Whitelist configuration preserved from your existing security rules
 const ALLOWED_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp',
   '.pdf', '.txt', '.csv',
@@ -30,13 +29,14 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    // Random name on disk avoids collisions and path traversal via the
-    // original filename - the human-readable name is kept separately in Mongo.
-    const uniqueName = crypto.randomBytes(16).toString('hex') + path.extname(file.originalname).toLowerCase();
-    cb(null, uniqueName);
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    return {
+      folder: 'taskflow_attachments',
+      resource_type: 'auto', // Automatically handles images, PDFs, docs, CSVs, etc.
+      public_id: `${Date.now()}-${file.originalname.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+    };
   },
 });
 
@@ -51,8 +51,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB - generous enough for screenshots/PDFs, not video files
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
 module.exports = upload;
-module.exports.UPLOAD_DIR = UPLOAD_DIR;
+module.exports.cloudinary = cloudinary;
