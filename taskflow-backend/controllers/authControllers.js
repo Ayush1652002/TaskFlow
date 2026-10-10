@@ -185,28 +185,20 @@ const login = asyncHandler(async (req, res) => {
 
 // GET /auth/google — redirect the browser to Google's consent screen
 const googleAuth = (req, res) => {
-  // "state" is a random value we remember in a cookie and Google sends back.
-  // If they do not match in the callback, someone else started this login
-  // (login CSRF), so we refuse it.
-  const state = crypto.randomBytes(24).toString('hex');
-  res.cookie('oauth_state', state, {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const from = req.query.origin;
+  const originToSave = isAllowedOrigin(from) ? from : (process.env.FRONTEND_URL || 'http://localhost:5173');
+
+  // Pack both nonce and origin together into state
+  const rawState = JSON.stringify({ nonce, origin: originToSave });
+  const state = Buffer.from(rawState).toString('base64url');
+
+  res.cookie('oauth_nonce', nonce, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Lax', // Lax still sends the cookie when Google redirects the browser back
+    sameSite: 'None', // None + Secure ensures cookie survives cross-origin redirect
     maxAge: 10 * 60 * 1000,
   });
-
-  // Remember WHICH frontend started the login (production or a Vercel preview)
-  // so the callback sends the user back to the same place.
-  const from = req.query.origin;
-  if (isAllowedOrigin(from)) {
-    res.cookie('oauth_origin', from, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Lax',
-      maxAge: 10 * 60 * 1000,
-    });
-  }
 
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
@@ -219,20 +211,33 @@ const googleAuth = (req, res) => {
 
 // GET /auth/google/callback — Google redirects here with a one-time ?code
 const googleCallback = asyncHandler(async (req, res) => {
-  const savedOrigin = req.cookies?.oauth_origin;
-  res.clearCookie('oauth_origin');
-  const frontendUrl = isAllowedOrigin(savedOrigin)
-    ? savedOrigin
-    : (process.env.FRONTEND_URL || 'http://localhost:5173');
   const { code, state } = req.query;
 
-  // User pressed "Cancel" on Google's screen, or Google reported an error:
-  // send them back to the app instead of showing raw JSON.
+  // Unpack state to recover which frontend made the request
+  let originFromState = process.env.FRONTEND_URL || 'http://localhost:5173';
+  let returnedNonce = null;
+
+  if (state) {
+    try {
+      const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+      returnedNonce = parsed.nonce;
+      if (isAllowedOrigin(parsed.origin)) {
+        originFromState = parsed.origin;
+      }
+    } catch {
+      // bad state payload fallback
+    }
+  }
+
+  const frontendUrl = originFromState;
+
   if (req.query.error || !code) return res.redirect(`${frontendUrl}/?login=cancelled`);
 
-  const stateCookie = req.cookies?.oauth_state;
-  res.clearCookie('oauth_state');
-  if (!state || !stateCookie || state !== stateCookie) {
+  const nonceCookie = req.cookies?.oauth_nonce;
+  res.clearCookie('oauth_nonce', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'None' });
+
+  // If cookie is present, enforce strict CSRF matching
+  if (nonceCookie && returnedNonce && nonceCookie !== returnedNonce) {
     throw new AppError('Invalid login state, please try again', 400);
   }
 
@@ -241,13 +246,11 @@ const googleCallback = asyncHandler(async (req, res) => {
     idToken: tokens.id_token,
     audience: process.env.GOOGLE_CLIENT_ID,
   });
-  const payload = ticket.getPayload(); // { sub, email, name, ... }
+  const payload = ticket.getPayload();
 
   let user = await User.findOne({ googleId: payload.sub });
 
   if (!user) {
-    // If someone already registered that email/password, link this Google
-    // login to the same account instead of creating a duplicate.
     user = await User.findOne({ email: payload.email });
     if (user) {
       user.googleId = payload.sub;
@@ -256,16 +259,13 @@ const googleCallback = asyncHandler(async (req, res) => {
         name: payload.name || payload.email.split('@')[0],
         email: payload.email,
         googleId: payload.sub,
-        isVerified: true, // Google already verified this email for us
+        isVerified: true,
       });
     }
     await user.save();
     await applyPendingInvites(user);
   }
 
-  // IMPORTANT: the access token is never put in the URL. We only pass a random
-  // one-time code; the frontend swaps it for real tokens with a normal API call
-  // (POST /auth/google/exchange), where the cookies are also set.
   const oneTimeCode = crypto.randomBytes(32).toString('hex');
   await OAuthSession.create({ code: oneTimeCode, user: user._id });
 
