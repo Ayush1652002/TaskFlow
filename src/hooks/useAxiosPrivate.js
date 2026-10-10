@@ -1,22 +1,7 @@
 import { useEffect } from 'react';
 import api from '../api/axios';
+import { refreshSession } from '../api/session';
 // changed
-
-// ONE shared refresh request for the whole app.
-// Before: 5 requests failing together = 5 refresh calls. The server rotates the
-// refresh token on every call, so calls 2-5 used an already-used token and the
-// server (correctly) thought it was stolen and logged the user out everywhere.
-// Now: the first failure starts the refresh, all others wait for the same result.
-let refreshPromise = null;
-
-const refreshAccessToken = () => {
-  if (!refreshPromise) {
-    refreshPromise = api.get('/auth/refresh')
-      .then((res) => res.data)
-      .finally(() => { refreshPromise = null; });
-  }
-  return refreshPromise;
-};
 
 const useAxiosPrivate = (auth, setAuth) => {
   useEffect(() => {
@@ -47,12 +32,15 @@ const useAxiosPrivate = (auth, setAuth) => {
         ) {
           prevRequest.sent = true;
           try {
-            const data = await refreshAccessToken();
+            // shared with the page-load bootstrap: never two refreshes at once
+            const data = await refreshSession();
             setAuth({ accessToken: data.accessToken, name: data.name, id: data.id });
             prevRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
             return api(prevRequest);
-          } catch {
-            setAuth(null);
+          } catch (refreshError) {
+            // Log out ONLY when the server says the session is really gone.
+            // A network blip / server restart keeps the user signed in.
+            if (refreshError?.sessionLost) setAuth(null);
           }
         }
         return Promise.reject(error);

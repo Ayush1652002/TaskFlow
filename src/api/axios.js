@@ -14,7 +14,8 @@ const api = axios.create({
 //  - Same domain (local dev, Nginx proxy): we can read the cookie directly.
 //  - Different domains (Vercel + Render): document.cookie CANNOT see the API's
 //    cookie, so the backend also returns the value in its JSON response and we
-//    keep a copy in sessionStorage (it survives a page reload, dies with the tab).
+//    keep a copy in localStorage (it survives reloads, new tabs and restarts).
+//    The backend also accepts our own Origin header, so this is a fallback.
 const CSRF_KEY = 'csrfToken';
 
 const getCookie = (name) => {
@@ -23,15 +24,15 @@ const getCookie = (name) => {
 };
 
 const readStoredCsrf = () => {
-  try { return sessionStorage.getItem(CSRF_KEY); } catch { return null; }
+  try { return localStorage.getItem(CSRF_KEY); } catch { return null; }
 };
 
 export const setCsrfToken = (token) => {
-  try { sessionStorage.setItem(CSRF_KEY, token); } catch { /* storage blocked: cookie fallback still works */ }
+  try { localStorage.setItem(CSRF_KEY, token); } catch { /* storage blocked: cookie fallback still works */ }
 };
 
 export const clearCsrfToken = () => {
-  try { sessionStorage.removeItem(CSRF_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(CSRF_KEY); } catch { /* ignore */ }
 };
 
 api.interceptors.request.use((config) => {

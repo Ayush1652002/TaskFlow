@@ -8,6 +8,7 @@ import Settings from "./Pages/Settings.jsx";
 import Trash from "./Pages/Trash.jsx";
 import Login from "./Pages/Login.jsx";
 import axios from "./api/axios";
+import { refreshSession } from "./api/session";
 import TaskProvider from "./Context/TaskContext";
 import WorkspaceProvider from "./Context/WorkspaceContext";
 import { WorkspaceContext } from "./Context/workspaceContextObject";
@@ -39,12 +40,15 @@ const App = () => {
     const bootstrap = async () => {
       try {
         // Google sign-in: swap the one-time code for real tokens (the access
-        // token itself is never placed in the URL).
-        const res = googleCode
-          ? await axios.post("/auth/google/exchange", { code: googleCode })
-          : await axios.get("/auth/refresh");
-        setAuth({ accessToken: res.data.accessToken, name: res.data.name, id: res.data.id });
+        // token itself is never placed in the URL). Otherwise restore the
+        // session from the refresh cookie (retries on network/server errors).
+        const data = googleCode
+          ? (await axios.post("/auth/google/exchange", { code: googleCode })).data
+          : await refreshSession();
+        setAuth({ accessToken: data.accessToken, name: data.name, id: data.id });
       } catch {
+        // Whether the session is gone or the server is unreachable, the login
+        // screen is the only safe place to land; a retry/login restores it.
         setAuth(null);
       } finally {
         setLoading(false);

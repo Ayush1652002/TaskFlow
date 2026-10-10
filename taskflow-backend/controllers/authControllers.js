@@ -12,6 +12,26 @@ const Workspace = require('../models/Workspace');
 const OAuthSession = require('../models/OAuthSession');
 // changed
 
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ROTATION_GRACE_MS = 60 * 1000; // a just-rotated token still works for 60s
+const MAX_SESSIONS = 10;             // per user (phones, laptops, tabs...)
+
+// Only the hash of a refresh token is stored in the DB, so a DB leak does not
+// leak usable sessions. SHA-256 (not bcrypt): the token is long and random.
+const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+
+const signAccessToken = (user) => jwt.sign(
+  { id: user._id, name: user.name },
+  process.env.ACCESS_TOKEN_SECRET,
+  { expiresIn: '15m' }
+);
+
+const signRefreshToken = (user) => jwt.sign(
+  { id: user._id, jti: crypto.randomBytes(8).toString('hex') }, // jti keeps every token unique
+  process.env.REFRESH_TOKEN_SECRET,
+  { expiresIn: '7d' }
+);
+
 // Sets the httpOnly refresh-token cookie and the readable CSRF cookie together,
 // since every place that issues a refresh token needs both.
 const setAuthCookies = (res, refreshToken) => {
@@ -19,7 +39,7 @@ const setAuthCookies = (res, refreshToken) => {
     httpOnly: true,
     secure: true,
     sameSite: 'None',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: REFRESH_TTL_MS,
   });
 
   const csrfToken = crypto.randomBytes(32).toString('hex');
@@ -27,7 +47,7 @@ const setAuthCookies = (res, refreshToken) => {
     httpOnly: false, // must be readable by frontend JS to echo back in a header
     secure: true,
     sameSite: 'None',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: REFRESH_TTL_MS,
   });
 
   // When the frontend and API are on DIFFERENT domains (Vercel + Render), the
@@ -49,19 +69,12 @@ const sessionPayload = (res, accessToken, user, extra = {}) => ({
 // Shared by login/Google/guest — signs both tokens, stores the refresh
 // token on the user doc, sets cookies, and returns what the JSON response needs.
 const issueSession = async (res, user) => {
-  const accessToken = jwt.sign(
-    { id: user._id, name: user.name },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: '15m' }
-  );
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
 
-  const refreshToken = jwt.sign(
-    { id: user._id },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  user.refreshTokens.push(refreshToken);
+  // Every login/exchange creates a brand-new session. Keep the newest
+  // MAX_SESSIONS so the list cannot grow forever.
+  user.refreshTokens = [...user.refreshTokens, hashToken(refreshToken)].slice(-MAX_SESSIONS);
   await user.save();
 
   setAuthCookies(res, refreshToken);
@@ -271,70 +284,102 @@ const guestLogin = asyncHandler(async (req, res) => {
   res.json(sessionPayload(res, accessToken, user, { isGuest: true }));
 });
 
-const refresh = asyncHandler(async (req, res) => {
-  const cookies = req.cookies;
-  if (!cookies?.jwt) throw new AppError('Unauthorized', 401);
-  const oldRefreshToken = cookies.jwt;
+const clearAuthCookies = (res) => {
+  res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true });
+  res.clearCookie('csrfToken', { httpOnly: false, sameSite: 'None', secure: true });
+};
 
-  // Verify signature/expiry first, synchronously via try/catch instead of
-  // the callback style, since we need the decoded id before touching the DB.
+// GET /auth/refresh - trades the httpOnly refresh cookie for a new access token.
+// 401 = the session is really gone (log the user out). Anything else = try again.
+const refresh = asyncHandler(async (req, res) => {
+  const oldRefreshToken = req.cookies?.jwt;
+  if (!oldRefreshToken) throw new AppError('Unauthorized', 401);
+
   let decoded;
   try {
     decoded = jwt.verify(oldRefreshToken, process.env.REFRESH_TOKEN_SECRET);
-  } catch (err) {
+  } catch {
+    clearAuthCookies(res);
     return res.status(401).json({ message: 'Invalid or expired refresh token' });
   }
 
-  const user = await User.findById(decoded.id);
-  if (!user) return res.status(401).json({ message: 'Unauthorized' });
+  const oldHash = hashToken(oldRefreshToken);
+  const newRefreshToken = signRefreshToken({ _id: decoded.id });
+  const newHash = hashToken(newRefreshToken);
+  const now = new Date();
+  const graceStart = new Date(now.getTime() - ROTATION_GRACE_MS);
 
-  const tokenIsCurrentlyValid = user.refreshTokens.includes(oldRefreshToken);
+  // ONE atomic database step: "if the old token is active, swap it for the new
+  // one". If two requests race, only one can win this step - no lost updates.
+  const user = await User.findOneAndUpdate(
+    { _id: decoded.id, refreshTokens: oldHash },
+    [{
+      $set: {
+        refreshTokens: {
+          $concatArrays: [
+            { $filter: { input: '$refreshTokens', cond: { $ne: ['$$this', oldHash] } } },
+            [newHash],
+          ],
+        },
+        rotatedTokens: {
+          $concatArrays: [
+            { $filter: { input: { $ifNull: ['$rotatedTokens', []] }, cond: { $gt: ['$$this.at', graceStart] } } },
+            [{ old: oldHash, next: newHash, at: now }],
+          ],
+        },
+      },
+    }],
+    { new: true }
+  );
 
-  if (!tokenIsCurrentlyValid) {
-    // This token was signed correctly (so it came from a real past login)
-    // but isn't in the user's active list — meaning it was already rotated
-    // away. Someone is replaying an old refresh token, most likely because
-    // it was stolen. Revoke every active session for this user as a precaution.
-    user.refreshTokens = [];
-    await user.save();
-    return res.status(401).json({ message: 'Refresh token reuse detected - all sessions revoked' });
+  if (user) {
+    setAuthCookies(res, newRefreshToken);
+    return res.json(sessionPayload(res, signAccessToken(user), user));
   }
 
-  // Rotate: remove the old token, issue and store a new one
-  const newRefreshToken = jwt.sign(
-    { id: user._id },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: '7d' }
-  );
+  // The old token was not active. Two possible reasons:
+  const existing = await User.findById(decoded.id);
+  if (!existing) {
+    clearAuthCookies(res);
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
-  user.refreshTokens = user.refreshTokens.filter(t => t !== oldRefreshToken);
-  user.refreshTokens.push(newRefreshToken);
-  await user.save();
+  // (a) A parallel refresh (second tab / reload) JUST rotated it. Not an attack:
+  //     hand back the successor token the winner created.
+  const recent = (existing.rotatedTokens || []).find((r) => r.old === oldHash && r.at > graceStart);
+  if (recent && existing.refreshTokens.includes(recent.next)) {
+    // We cannot rebuild the raw successor token (only its hash is stored), so
+    // the loser gets a new access token and keeps its current cookie. The
+    // winner's response already carries the new cookie, which the browser
+    // stores - both requests end up logged in.
+    const accessToken = signAccessToken(existing);
+    return res.json(sessionPayload(res, accessToken, existing, { graceRefresh: true }));
+  }
+  // Rotated recently but its successor is gone too (user logged out in between):
+  // the session is simply over. Not theft, so do not touch other devices.
+  if (recent) {
+    clearAuthCookies(res);
+    return res.status(401).json({ message: 'Session ended' });
+  }
 
-  const accessToken = jwt.sign(
-    { id: user._id, name: user.name },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: '15m' }
-  );
-
-  setAuthCookies(res, newRefreshToken);
-
-  res.json(sessionPayload(res, accessToken, user));
+  // (b) Old token reused long after rotation: likely stolen. Revoke everything.
+  await User.updateOne({ _id: decoded.id }, { $set: { refreshTokens: [], rotatedTokens: [] } });
+  clearAuthCookies(res);
+  return res.status(401).json({ message: 'Refresh token reuse detected - all sessions revoked' });
 });
 
+// POST /auth/logout - removes THIS session's refresh token from the database.
+// Always clears the cookies and answers 200, even if the token was already gone.
 const logout = asyncHandler(async (req, res) => {
-  const cookies = req.cookies;
-  if (!cookies?.jwt) return res.sendStatus(204);
-
-  const refreshToken = cookies.jwt;
-  const user = await User.findOne({ refreshTokens: refreshToken });
-  if (user) {
-    user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
-    await user.save();
+  const refreshToken = req.cookies?.jwt;
+  if (refreshToken) {
+    const h = hashToken(refreshToken);
+    await User.updateOne(
+      { $or: [{ refreshTokens: h }, { 'rotatedTokens.next': h }] },
+      { $pull: { refreshTokens: h, rotatedTokens: { next: h } } }
+    );
   }
-
-  res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true });
-  res.clearCookie('csrfToken', { httpOnly: false, sameSite: 'None', secure: true });
+  clearAuthCookies(res);
   res.json({ message: 'Logged out' });
 });
 

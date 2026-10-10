@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const errorHandler = require('./middleware/errorHandler');
+const AppError = require('./utils/AppError');
 // changed
 const app = express();
 
@@ -15,17 +16,14 @@ app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10) || 1);
 // Helmet blocks cross-origin resource loading by default, which would break
 // downloading/previewing attachment files from the frontend's origin.
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-const allowedOrigins = [
-  'http://localhost:5173',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+const allowedOrigins = require('./config/origins');
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new AppError('Not allowed by CORS', 403)); // 403, not a 500
     }
   },
   credentials: true,

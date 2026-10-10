@@ -42,8 +42,16 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // SHA-256 hashes of the active refresh tokens (never the raw token).
   refreshTokens: {
     type: [String],
+    default: [],
+  },
+  // Tokens rotated in the last minute. If a second refresh arrives with one of
+  // these (two tabs / reload racing), we answer it with the same successor
+  // instead of treating it as theft and logging everybody out.
+  rotatedTokens: {
+    type: [{ old: String, next: String, at: Date, _id: false }],
     default: [],
   },
   defaultPriority: {
