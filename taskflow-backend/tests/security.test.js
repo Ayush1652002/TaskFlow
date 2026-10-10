@@ -30,9 +30,14 @@ describe('Security + fixes (Line 1 and 2)', () => {
   });
 
   afterAll(() => {
-    savedFiles.forEach((f) => fs.rmSync(path.join(UPLOAD_DIR, f), { force: true }));
+    savedFiles.filter(Boolean).forEach((f) => {
+      const dir = typeof UPLOAD_DIR !== 'undefined' ? UPLOAD_DIR : path.join(__dirname, '..', 'uploads');
+      try {
+        fs.rmSync(path.join(dir, f), { force: true });
+      } catch (_) {}
+    });
   });
-
+  
   const createTask = async (user, title = 'Task') => {
     const res = await request(app).post(`/tasks/${workspaceId}`).set(auth(user)).send({ title });
     return res.body;

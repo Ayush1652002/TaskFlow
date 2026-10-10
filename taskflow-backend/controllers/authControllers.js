@@ -36,18 +36,20 @@ const signRefreshToken = (user) => jwt.sign(
 // Sets the httpOnly refresh-token cookie and the readable CSRF cookie together,
 // since every place that issues a refresh token needs both.
 const setAuthCookies = (res, refreshToken) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   res.cookie('jwt', refreshToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'None',
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax',
     maxAge: REFRESH_TTL_MS,
   });
 
   const csrfToken = crypto.randomBytes(32).toString('hex');
   res.cookie('csrfToken', csrfToken, {
     httpOnly: false, // must be readable by frontend JS to echo back in a header
-    secure: true,
-    sameSite: 'None',
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax',
     maxAge: REFRESH_TTL_MS,
   });
 
@@ -192,13 +194,20 @@ const googleAuth = (req, res) => {
   // Pack both nonce and origin together into state
   const rawState = JSON.stringify({ nonce, origin: originToSave });
   const state = Buffer.from(rawState).toString('base64url');
-
-  res.cookie('oauth_nonce', nonce, {
+  
+  const oauthCookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'None', // None + Secure ensures cookie survives cross-origin redirect
+    sameSite: 'None',
     maxAge: 10 * 60 * 1000,
-  });
+  };
+
+  res.cookie('oauth_nonce', nonce, oauthCookieOptions);
+
+  if (isAllowedOrigin(from)) {
+    res.cookie('oauth_origin', originToSave, oauthCookieOptions);
+  }
+  
 
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
@@ -235,6 +244,7 @@ const googleCallback = asyncHandler(async (req, res) => {
 
   const nonceCookie = req.cookies?.oauth_nonce;
   res.clearCookie('oauth_nonce', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'None' });
+  res.clearCookie('oauth_origin', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'None' });
 
   // If cookie is present, enforce strict CSRF matching
   if (nonceCookie && returnedNonce && nonceCookie !== returnedNonce) {
@@ -302,8 +312,9 @@ const guestLogin = asyncHandler(async (req, res) => {
 });
 
 const clearAuthCookies = (res) => {
-  res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true });
-  res.clearCookie('csrfToken', { httpOnly: false, sameSite: 'None', secure: true });
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.clearCookie('jwt', { httpOnly: true, sameSite: isProduction ? 'None' : 'Lax', secure: isProduction });
+  res.clearCookie('csrfToken', { httpOnly: false, sameSite: isProduction ? 'None' : 'Lax', secure: isProduction });
 };
 
 // GET /auth/refresh - trades the httpOnly refresh cookie for a new access token.

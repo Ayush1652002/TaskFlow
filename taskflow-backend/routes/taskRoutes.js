@@ -9,7 +9,7 @@ const { getComments, addComment } = require('../controllers/commentControllers')
 const { getTaskHistory } = require('../controllers/activityControllers');
 const { uploadAttachment, downloadAttachment, deleteAttachment } = require('../controllers/attachmentControllers');
 const upload = require('../middleware/upload');
-// changed
+
 // All task routes are nested under a workspace: /tasks/:workspaceId/...
 router.use('/:workspaceId', verifyJWT, requireWorkspaceRole('member'));
 

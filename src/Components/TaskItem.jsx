@@ -42,7 +42,7 @@ const TaskItemComponent = ({ task }) => {
         role="button"
         tabIndex={0}
         aria-label={`Reorder task: ${task.title}`}
-        className="text-gray-600 cursor-grab hover:text-gray-400 transition"
+        className="text-gray-600 cursor-grab hover:text-gray-400 transition select-none"
       >
         ⠿
       </span>
@@ -60,9 +60,14 @@ const TaskItemComponent = ({ task }) => {
       />
 
       {/* Title */}
-      <div className="flex-1 cursor-pointer relative group/title" onClick={() => setShowDetail(true)}>
-        <span className="pointer-events-none absolute -top-7 left-0 text-[10px] text-gray-300 bg-[#2e2e2e] px-2 py-1 rounded-md opacity-0 group-hover/title:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-          Click to edit task
+      <div
+        className="flex-1 min-w-[120px] cursor-pointer py-1 relative group/title select-none"
+        onClick={() => {
+          if (!isEditing) setShowDetail(true);
+        }}
+      >
+        <span className="pointer-events-none absolute -top-7 left-0 text-[10px] text-gray-300 bg-[#2e2e2e] px-2 py-1 rounded-md opacity-0 group-hover/title:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 hidden sm:inline-block">
+          Click to view task
         </span>
         {isEditing ? (
           <input
@@ -71,6 +76,7 @@ const TaskItemComponent = ({ task }) => {
             onKeyDown={(e) => e.key === "Enter" && saveEdit()}
             onBlur={saveEdit}
             autoFocus
+            onClick={(e) => e.stopPropagation()}
             className="bg-transparent text-sm text-white outline-none w-full"
           />
         ) : (
@@ -79,14 +85,14 @@ const TaskItemComponent = ({ task }) => {
               {task.title}
             </span>
             {task.description && (
-              <span className="text-xs text-gray-500 mt-0.5">{task.description}</span>
+              <span className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</span>
             )}
           </div>
         )}
       </div>
 
       {/* Badges */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
         <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${priorityColors[task.priority]}`}>
           {task.priority}
         </span>
@@ -98,15 +104,15 @@ const TaskItemComponent = ({ task }) => {
         )}
 
         {task.dueDate && (
-  <span className={`text-xs px-2 py-0.5 rounded-md ${
-    formatDueDate(task.dueDate) === 'Overdue' ? 'text-red-400 bg-red-400/10' :
-    formatDueDate(task.dueDate) === 'Today' ? 'text-yellow-400 bg-yellow-400/10' :
-    formatDueDate(task.dueDate) === 'Tomorrow' ? 'text-blue-400 bg-blue-400/10' :
-    'text-gray-400 bg-white/5'
-  }`}>
-    📅 {formatDueDate(task.dueDate)}
-  </span>
-)}
+          <span className={`text-xs px-2 py-0.5 rounded-md ${
+            formatDueDate(task.dueDate) === 'Overdue' ? 'text-red-400 bg-red-400/10' :
+            formatDueDate(task.dueDate) === 'Today' ? 'text-yellow-400 bg-yellow-400/10' :
+            formatDueDate(task.dueDate) === 'Tomorrow' ? 'text-blue-400 bg-blue-400/10' :
+            'text-gray-400 bg-white/5'
+          }`}>
+            📅 {formatDueDate(task.dueDate)}
+          </span>
+        )}
 
         {task.assignee?.name && (
           <span className="text-xs px-2 py-0.5 rounded-md text-gray-300 bg-white/5">
@@ -144,7 +150,8 @@ const TaskItemComponent = ({ task }) => {
           Delete
         </button>
       </div>
-    {showDetail && <TaskDetailPanel task={task} onClose={() => setShowDetail(false)} />}
+
+      {showDetail && <TaskDetailPanel task={task} onClose={() => setShowDetail(false)} />}
     </div>
   );
 };

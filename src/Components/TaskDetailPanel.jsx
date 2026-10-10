@@ -7,7 +7,7 @@ import TaskAttachments from "./TaskAttachments";
 
 const TaskDetailPanel = ({ task, onClose }) => {
   const { editTask, toggleTask, deleteTask, updateTaskAttachments } = useContext(TaskContext);
-  const { activeWorkspace } = useContext(WorkspaceContext);
+  const { activeWorkspace, myRole, auth } = useContext(WorkspaceContext);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [priority, setPriority] = useState(task.priority);
@@ -15,14 +15,33 @@ const TaskDetailPanel = ({ task, onClose }) => {
   const [status, setStatus] = useState(task.status);
   const [assignee, setAssignee] = useState(task.assignee?._id || task.assignee || "");
   const [recurrence, setRecurrence] = useState(task.recurrence || "none");
-  // dueDate from the API is an ISO string; <input type="date"> needs yyyy-mm-dd
   const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.slice(0, 10) : "");
   const [saving, setSaving] = useState(false);
 
+  // Permission check matches backend canModifyTask logic:
+  // owner, admin, manager, task creator, or assignee can modify.
+  const currentUserId = auth?.id;
+  const taskCreatorId = task.user?._id || task.user;
+  const taskAssigneeId = task.assignee?._id || task.assignee;
+  const canEdit =
+    ["owner", "admin", "manager"].includes(myRole) ||
+    String(taskCreatorId) === String(currentUserId) ||
+    (taskAssigneeId && String(taskAssigneeId) === String(currentUserId));
+
   const handleSave = async () => {
+    if (!canEdit) return;
     setSaving(true);
     try {
-      await editTask(task._id, { title, description, priority, category, status, dueDate, assignee: assignee || null, recurrence });
+      await editTask(task._id, {
+        title,
+        description,
+        priority,
+        category,
+        status,
+        dueDate,
+        assignee: assignee || null,
+        recurrence,
+      });
       onClose();
     } finally {
       setSaving(false);
@@ -39,8 +58,17 @@ const TaskDetailPanel = ({ task, onClose }) => {
 
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-400">Task Detail</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition text-lg">✕</button>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-medium text-gray-400">Task Detail</h2>
+            {!canEdit && (
+              <span className="text-[10px] bg-[#1e1e1e] text-gray-400 px-2 py-0.5 rounded-full border border-[#2e2e2e]">
+                View Only
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition text-lg p-1">
+            ✕
+          </button>
         </div>
 
         {/* Title */}
@@ -48,8 +76,9 @@ const TaskDetailPanel = ({ task, onClose }) => {
           <label className="text-xs text-gray-500">Title</label>
           <input
             value={title}
+            disabled={!canEdit}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-3 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+            className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-3 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
           />
         </div>
 
@@ -58,20 +87,22 @@ const TaskDetailPanel = ({ task, onClose }) => {
           <label className="text-xs text-gray-500">Description</label>
           <textarea
             value={description}
+            disabled={!canEdit}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-3 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition resize-none"
+            className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-3 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition resize-none"
           />
         </div>
 
-        {/* Meta — now real inputs, not read-only text */}
+        {/* Meta */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Priority</label>
             <select
               value={priority}
+              disabled={!canEdit}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
             >
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
@@ -82,8 +113,9 @@ const TaskDetailPanel = ({ task, onClose }) => {
             <label className="text-xs text-gray-500">Category</label>
             <select
               value={category}
+              disabled={!canEdit}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
             >
               <option value="General">General</option>
               <option value="Work">Work</option>
@@ -96,8 +128,9 @@ const TaskDetailPanel = ({ task, onClose }) => {
             <label className="text-xs text-gray-500">Status</label>
             <select
               value={status}
+              disabled={!canEdit}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition capitalize"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition capitalize"
             >
               <option value="todo">Todo</option>
               <option value="inprogress">In Progress</option>
@@ -108,24 +141,28 @@ const TaskDetailPanel = ({ task, onClose }) => {
             <label className="text-xs text-gray-500">Due Date</label>
             <input
               type="date"
+              disabled={!canEdit}
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
             />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-500">Assignee</label>
             <select
               value={assignee}
+              disabled={!canEdit}
               onChange={(e) => setAssignee(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
             >
               <option value="">Unassigned</option>
               {activeWorkspace?.members?.map((m) => {
                 const memberId = m.user._id || m.user;
                 const memberName = m.user.name || "Unknown";
                 return (
-                  <option key={memberId} value={memberId}>{memberName}</option>
+                  <option key={memberId} value={memberId}>
+                    {memberName}
+                  </option>
                 );
               })}
             </select>
@@ -134,8 +171,9 @@ const TaskDetailPanel = ({ task, onClose }) => {
             <label className="text-xs text-gray-500">Repeat</label>
             <select
               value={recurrence}
+              disabled={!canEdit}
               onChange={(e) => setRecurrence(e.target.value)}
-              className="w-full bg-[#1e1e1e] text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
+              className="w-full bg-[#1e1e1e] disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm rounded-lg px-2 py-2 outline-none border border-[#2e2e2e] focus:border-violet-500 transition"
             >
               <option value="none">Doesn't repeat</option>
               <option value="daily">Daily</option>
@@ -151,28 +189,30 @@ const TaskDetailPanel = ({ task, onClose }) => {
           <span className="text-xs text-gray-400">{task.completed ? "Completed" : "Pending"}</span>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button
-            onClick={() => { toggleTask(task._id); onClose(); }}
-            className="flex-1 bg-[#1e1e1e] hover:bg-[#2e2e2e] text-gray-300 text-sm py-2 rounded-lg transition"
-          >
-            {task.completed ? "Mark Pending" : "Mark Done"}
-          </button>
-          <button
-            onClick={() => { deleteTask(task._id); onClose(); }}
-            className="px-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm py-2 rounded-lg transition"
-          >
-            Delete
-          </button>
-        </div>
+        {/* Actions (Only rendered if user has edit rights) */}
+        {canEdit && (
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+            <button
+              onClick={() => { toggleTask(task._id); onClose(); }}
+              className="flex-1 bg-[#1e1e1e] hover:bg-[#2e2e2e] text-gray-300 text-sm py-2 rounded-lg transition"
+            >
+              {task.completed ? "Mark Pending" : "Mark Done"}
+            </button>
+            <button
+              onClick={() => { deleteTask(task._id); onClose(); }}
+              className="px-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm py-2 rounded-lg transition"
+            >
+              Delete
+            </button>
+          </div>
+        )}
 
         <hr className="border-[#1e1e1e]" />
         <TaskAttachments task={task} onUpdated={(list) => updateTaskAttachments(task._id, list)} />

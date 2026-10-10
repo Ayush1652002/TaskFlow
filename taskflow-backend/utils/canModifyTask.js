@@ -3,11 +3,22 @@
 // a task they created or that is assigned to them.
 // Used by taskControllers AND attachmentControllers so the rule lives in one place.
 const ELEVATED_ROLES = ['owner', 'admin', 'manager'];
-// changed
+
 const canModifyTask = (req, task) => {
-  if (ELEVATED_ROLES.includes(req.membership.role)) return true;
-  if (task.user.toString() === req.user.id) return true;
-  if (task.assignee && task.assignee.toString() === req.user.id) return true;
+  if (!req || !task) return false;
+
+  const userRole = req.membership?.role;
+  if (userRole && ELEVATED_ROLES.includes(userRole)) return true;
+
+  const currentUserId = req.user?.id || req.user?._id;
+  if (!currentUserId) return false;
+
+  const creatorId = task.user?._id || task.user;
+  if (creatorId && creatorId.toString() === currentUserId.toString()) return true;
+
+  const assigneeId = task.assignee?._id || task.assignee;
+  if (assigneeId && assigneeId.toString() === currentUserId.toString()) return true;
+
   return false;
 };
 
